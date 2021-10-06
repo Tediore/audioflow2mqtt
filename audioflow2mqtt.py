@@ -5,8 +5,8 @@ import socket
 import logging
 import requests
 from time import sleep
-import paho.mqtt.client as mqtt_client
 from threading import Thread as t
+import paho.mqtt.client as mqtt_client
 
 MQTT_HOST = os.getenv('MQTT_HOST')
 MQTT_PORT = int(os.getenv('MQTT_PORT', 1883))
@@ -14,6 +14,8 @@ MQTT_USER = os.getenv('MQTT_USER')
 MQTT_PASSWORD = os.getenv('MQTT_PASSWORD')
 MQTT_CLIENT = os.getenv('MQTT_CLIENT', 'audioflow2mqtt')
 MQTT_QOS = int(os.getenv('MQTT_QOS', 1))
+BASE_TOPIC = os.getenv('BASE_TOPIC', 'audioflow2mqtt')
+HOME_ASSISTANT = os.getenv('HOME_ASSISTANT', True)
 DEVICE_IP = os.getenv('DEVICE_IP')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 DISCOVERY_PORT = os.getenv('DISCOVERY_PORT', 54321)
@@ -21,19 +23,20 @@ DISCOVERY_PORT = os.getenv('DISCOVERY_PORT', 54321)
 pong = ""
 device_ip = ""
 device_info = ""
-mqtt_connected = False
+switch_names = []
 discovery = True
+states = {
+    'off': '0',
+    'on': '1'
+}
 
 client = mqtt_client.Client(MQTT_CLIENT)
 
-sub_topics = [
-    'switch/',
-    'zones/',
-    'zonename/'
-]
-
-for index, topic in enumerate(sub_topics):
-    sub_topics[index] = 'audioflow2mqtt/' + sub_topics[index]
+if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
+    logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
+    logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default')
+else:
+    logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
 
 if DEVICE_IP != None:
     logging.info('Device IP set; discovery is disabled.')
@@ -41,12 +44,6 @@ if DEVICE_IP != None:
     device_ip = DEVICE_IP
 else:
     logging.debug('No device IP set; discovery is enabled.')
-
-if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
-    logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
-    logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default')
-else:
-    logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
 
 def discover_send():
     # Send discovery UDP packet to broadcast address
@@ -72,99 +69,131 @@ def discover_receive():
     # Listen for discovery response from Audioflow device
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    global pong
+    global info
     try:
         sock.bind(('0.0.0.0', DISCOVERY_PORT))
     except Exception as e:
         logging.error(f'Unable to bind port {DISCOVERY_PORT}: {e}')
-
-    while True:
-        global pong
-        global info
-        data = sock.recvfrom(1024)
-        pong, info = data
-        pong = pong.decode('utf-8')
-        sleep(5)
-        break
+    while udp_discover:
+        try:
+            data = sock.recvfrom(1024)
+            pong, info = data
+            pong = pong.decode('utf-8')
+        except AttributeError as e:
+            logging.debug(f"I don't know why this happens, but I don't want it crashing the program: {e}")
 
 def mqtt_connect():
     # Connect to MQTT broker, set LWT, and start loop
-    global mqtt_connected
     try:
         client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
         # client.will_set('audioflow2mqtt/status', 'offline', 0, True)
         client.on_connect = on_mqtt_connect
         client.on_message = on_message
         client.connect(MQTT_HOST, MQTT_PORT)
-        client.loop_start()
         # client.publish('audioflow2mqtt/status', 'online', 0, True)
-        logging.info('Connected to MQTT broker.')
-        mqtt_connected = True
     except Exception as e:
         logging.error(f'Unable to connect to MQTT broker: {e}')
         sys.exit()
 
 def on_mqtt_connect(client, userdata, flags, rc):
     # The callback for when the client receives a CONNACK response from the server.
-    logging.debug('Connected with result code ' + str(rc))
+    logging.info('Connected to MQTT broker with result code ' + str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    for topic in sub_topics:
-        client.subscribe(topic + '#')
+    client.subscribe(f'{BASE_TOPIC}/{serial_no}/' + '#')
+    mqtt_discovery()
 
 def on_message(client, userdata, msg):
-    payload = str(msg.payload.decode('utf-8'))
+    payload = msg.payload.decode('utf-8')
     topic = str(msg.topic)
-    print(topic)
-    print(payload)
-    if 'zones' in topic and payload in ['0', '1'] and topic[-1:] in ['0', '1', '2', '3']:
-        set_zone_state(topic[-1:], payload)
+    switch_no = topic[topic.find('/set')-1]
+    if topic.endswith('set_zone_state'):
+        set_zone_state(switch_no, payload)
+    elif topic.endswith('set_zone_enable'):
+        set_zone_enable(switch_no, payload)
 
 def get_device_info(device_url):
     # Get info about Audioflow device
     global device_info
+    global serial_no
+    global model
+    global name
+    global zone_count
     try:
         device_info = requests.get(device_url + 'switch')
         device_info = json.loads(device_info.text)
+        zone_info = requests.get(device_url + 'zones')
+        zone_info = json.loads(zone_info.text)
+        serial_no = device_info['serial']
+        model = device_info['model']
+        zone_count = int(model[-2:-1]) # Second to last character in device model name shows zone count
+        name = device_info['name']
         if discovery:
-            logging.info(f"Audioflow model {device_info['model']} with name {device_info['name']} discovered at {info[0]}")
+            logging.info(f"Audioflow model {model} with name {name} discovered at {info[0]}")
         else:
-            logging.info(f"Audioflow model {device_info['model']} with name {device_info['name']} found at {DEVICE_IP}")
+            logging.info(f"Audioflow model {model} with name {name} found at {DEVICE_IP}")
     except:
         logging.error('No Audioflow device found.')
         sys.exit()
+    
+    for x in range(1,zone_count+1):
+        switch_names.append(zone_info['zones'][int(x)-1]['name'])
 
 def get_one_zone(zone_no):
     # Get info about one zone
     global device_url
-    zone = requests.get(device_url + 'zones/' + str(zone_no))
-    zone = json.loads(zone.text)
+    zones = requests.get(device_url + 'zones')
+    zones = json.loads(zones.text)
+    client.publish(f'{BASE_TOPIC}/{serial_no}/{zone_no}/zone_state', str(zones['zones'][int(zone_no)-1]['state']))
 
 def get_all_zones():
     # Get info about all zones
     global device_url
+    global switch_names
     zones = requests.get(device_url + 'zones')
     zones = json.loads(zones.text)
-    print(zones)
+    for x in range(1,zone_count+1):
+        client.publish(f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', str(zones['zones'][int(x)-1]['state']))
 
 def set_zone_state(zone_no, zone_state):
     # Change state of one zone
     global device_url
-    requests.put(device_url + 'zones/' + str(zone_no), data=str(zone_state))
-    get_all_zones()
+    data = states[zone_state]
+    try:
+        data = states[zone_state]
+        r = requests.put(device_url + 'zones/' + str(zone_no), data=str(data))
+    except Exception as e:
+        print(f'Error:{e}')
+    get_one_zone(zone_no)
 
-def set_zone_enable(zone_no, zone_enable, zone_name):
-    # Enable or disable zone and change zone name
+def set_zone_enable(zone_no, zone_enable): # WIP
+    # Enable or disable zone
     global device_url
-    requests.put(device_url + 'zonename/' + str(zone_no), data=str(str(zone_enable) + str(zone_name)))
-    get_all_zones()
+    try:
+        requests.put(device_url + 'zonename/' + str(zone_no), data=str(str(zone_enable) + ' ' + str(switch_names[int(zone_no)-1])))
+    except Exception as e:
+        print(e)
+    get_one_zone(zone_no)
 
 def poll_device():
     # Poll for Audioflow device information every 10 seconds in case button(s) is/are pressed on device
     while True:
-        get_all_zones()
         sleep(10)
+        get_all_zones()
+
+def mqtt_discovery():
+    # Send Home Assistant MQTT discovery payloads
+    if HOME_ASSISTANT:
+        ha_switch = 'homeassistant/switch/'
+        try:
+            for x in range(1,zone_count+1):
+                client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability':'[]', 'name':f'{switch_names[x-1]}', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/zones', 'value_template':f'{{ value_json["zones"][{x}]["state"] }}', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'suggested_area': 'Home'}))
+        except Exception as e:
+            print(f'Unable to publish: {e}')
 
 if discovery:
+    udp_discover = True
     discover_rx = t(target=discover_receive)
     discover_rx.start()
     discover_send()
@@ -177,8 +206,8 @@ elif discovery and 'afpong' in pong:
     device_url = f'http://{info[0]}/'
     get_device_info(device_url)
     device_ip = info[0]
-    discover_rx.join()
-    logging.debug('Discovery stopped.')
+    udp_discover = False
+    logging.info('UDP discovery stopped')
 else:
     logging.error('No Audioflow device found.')
     sys.exit()
