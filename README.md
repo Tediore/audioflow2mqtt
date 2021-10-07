@@ -38,7 +38,7 @@ services:
 | `MQTT_CLIENT` | `audioflow2mqtt` | True | The client name for the MQTT connection. |
 | `MQTT_QOS` | `1` | False | The MQTT QoS level. |
 | `BASE_TOPIC` | `audioflow2mqtt` | True | The topic prefix to use for all payloads. |
-| `HOME_ASSISTANT` | `True` | False | Enable/disable Home Assistant MQTT discovery. |
+| `HOME_ASSISTANT` | `True` | False | Set to `True` to enable Home Assistant MQTT discovery and `False` to disable. |
 | `DEVICE_IP` | `None` | False | IP address of your Audioflow device. Not required if using UDP discovery. |
 | `DISCOVERY_PORT` | `54321` | False | The port to open on the host to send/receive UDP discovery packets. Required if `DEVICE_IP` is not set. |
 | `LOG_LEVEL` | `info` | False | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error`. |
