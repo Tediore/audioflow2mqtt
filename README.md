@@ -79,4 +79,5 @@ When the zone state or enabled/disabled status is changed, audioflow2mqtt publis
 
 # TODO
 1. Handle Audioflow device disconnects/reconnects
-2. You tell me!
+2. Add support for multiple Audioflow switches? Not sure how many people would have more than one.
+3. You tell me!
