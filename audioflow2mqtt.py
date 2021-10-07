@@ -66,7 +66,6 @@ def udp_discover_send():
         sys.exit()
 
 def udp_discover_receive():
-    logging.info('starting udp_discover_receive')
     """Listen for discovery response from Audioflow device"""
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
