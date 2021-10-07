@@ -1,6 +1,6 @@
 # Audioflow to MQTT Gateway
 
-`audioflow2mqtt` enables you to control your Audioflow speaker switch locally via MQTT. It supports Home Assistant MQTT discovery for easy integration. It can also automatically discover the Audioflow device on your network via UDP discovery (you can also specify the IP address of the Audioflow device if you don't want to use UDP discovery). Currently only supports one Audioflow device unless you run separate instances.
+`audioflow2mqtt` enables local control of your Audioflow speaker switch via MQTT. It supports Home Assistant MQTT discovery for easy integration. It can also automatically discover the Audioflow device on your network via UDP discovery (you can also specify the IP address of the Audioflow device if you don't want to use UDP discovery). Currently only supports one Audioflow device unless you run separate instances.
 
 **This is a initial release which might have bugs but should be reasonably stable.**
 
@@ -43,7 +43,7 @@ services:
 | `DISCOVERY_PORT` | `54321` | False | The port to open on the host to send/receive UDP discovery packets. Required if `DEVICE_IP` is not set. |
 | `LOG_LEVEL` | `info` | False | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error`. |
 
-# Home Assistant integration
+# Home Assistant
 `audioflow2mqtt` supports Home Assistant MQTT discovery which creates a Device for the Audioflow switch and entities for each zone and enabling/disabling zones.
 
 ![Home Assistant Device screenshot](ha_screenshot.png)
