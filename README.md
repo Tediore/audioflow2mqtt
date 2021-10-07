@@ -1,6 +1,6 @@
 # Audioflow to MQTT Gateway
 
-`audioflow2mqtt` enables local control of your Audioflow speaker switch via MQTT. It supports Home Assistant MQTT discovery for easy integration. It can also automatically discover the Audioflow device on your network via UDP discovery (you can also specify the IP address of the Audioflow device if you don't want to use UDP discovery). Currently only supports one Audioflow device unless you run separate instances.
+audioflow2mqtt enables local control of your Audioflow speaker switch via MQTT. It supports Home Assistant MQTT discovery for easy integration. It can also automatically discover the Audioflow device on your network via UDP discovery (you can also specify the IP address of the Audioflow device if you don't want to use UDP discovery). Currently only supports one Audioflow device unless you run separate instances.
 
 **This is a initial release which might have bugs but should be reasonably stable.**
 
@@ -41,15 +41,15 @@ services:
 | `HOME_ASSISTANT` | `True` | False | Set to `True` to enable Home Assistant MQTT discovery and `False` to disable. |
 | `DEVICE_IP` | `None` | False | IP address of your Audioflow device. Not required if using UDP discovery. |
 | `DISCOVERY_PORT` | `54321` | False | The port to open on the host to send/receive UDP discovery packets. Required if `DEVICE_IP` is not set. |
-| `LOG_LEVEL` | `info` | False | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error`. |
+| `LOG_LEVEL` | `info` | False | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `erro
 
 # Home Assistant
-`audioflow2mqtt` supports Home Assistant MQTT discovery which creates a Device for the Audioflow switch and entities for each zone and enabling/disabling zones.
+audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for the Audioflow switch and entities for each zone and enabling/disabling zones.
 
 ![Home Assistant Device screenshot](ha_screenshot.png)
 
 # MQTT topic structure and examples
-The command topics start with `BASE_TOPIC/serial_number/zone_number/` where `BASE_TOPIC` is the base topic you define, `serial_number` is the device serial number (found on the sticker on the bottom of the device) and `zone_number` is the switch you want to control (starting from 1 on the left)
+The command topics start with `BASE_TOPIC/serial_number/zone_number/` where `BASE_TOPIC` is the base topic you define, `serial_number` is the device serial number (found on the sticker on the bottom of the device) and `zone_number` is the zone you want to control (starting from 1 on the left).
 
 The examples below assume the base topic is the default (`audioflow2mqtt`) and the serial number is `0123456789`.
 
@@ -73,11 +73,15 @@ When the zone state or enabled/disabled status is changed, audioflow2mqtt publis
 
 **Zone enabled/disabled:** `audioflow2mqtt/0123456789/ZONE/zone_enabled`
 
+# Other notes
+While audioflow2mqtt does support UDP discovery of Audioflow devices, creating a DHCP reservation for your Audioflow device and setting `DEVICE_IP` is recommended.
+
 <br>
 <a href="https://www.buymeacoffee.com/tediore" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
 
 
 # TODO
 1. Handle Audioflow device disconnects/reconnects
-2. Add support for multiple Audioflow switches? Not sure how many people would have more than one.
-3. You tell me!
+2. Add support for re-discovery of Audioflow switch if its IP address changes
+3. Add support for multiple Audioflow switches? Not sure how many people would have more than one.
+4. You tell me!
