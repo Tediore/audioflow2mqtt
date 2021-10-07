@@ -68,3 +68,6 @@ When the zone state or enabled/disabled status is changed, audioflow2mqtt publis
 **Zone state:** `audioflow2mqtt/0123456789/ZONE/zone_state`
 
 **Zone enabled/disabled:** `audioflow2mqtt/0123456789/ZONE/zone_enabled`
+
+<br>
+<a href="https://www.buymeacoffee.com/tediore" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
