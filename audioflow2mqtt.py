@@ -29,6 +29,9 @@ states = {
     'off': '0',
     'on': '1'
 }
+timeout = 3
+zones = ""
+retry_count = 0
 
 client = mqtt_client.Client(MQTT_CLIENT)
 
@@ -76,7 +79,7 @@ def udp_discover_receive():
         logging.debug(f'Opening port {DISCOVERY_PORT}')
     except Exception as e:
         logging.error(f'Unable to bind port {DISCOVERY_PORT}: {e}')
-        logging.error('Do you have host networking enabled?')
+        logging.error(f'Make sure nothing is currently using port {DISCOVERY_PORT}')
         sys.exit()
     while udp_discover:
         try:
@@ -84,7 +87,7 @@ def udp_discover_receive():
             pong, info = data
             pong = pong.decode('utf-8')
         except AttributeError as e:
-            logging.debug(f"I don't know why this happens, but I don't want it crashing the program: {e}")
+            logging.debug(f"I don't know why this happens sometimes, but I don't want it crashing the program: {e}")
 
 def mqtt_connect():
     """Connect to MQTT broker and set LWT"""
@@ -126,9 +129,9 @@ def get_device_info(device_url):
     global name
     global switch_names
     try:
-        device_info = requests.get(device_url + 'switch')
+        device_info = requests.get(url=device_url + 'switch', timeout=timeout)
         device_info = json.loads(device_info.text)
-        zone_info = requests.get(device_url + 'zones')
+        zone_info = requests.get(url=device_url + 'zones', timeout=timeout)
         zone_info = json.loads(zone_info.text)
         serial_no = device_info['serial']
         model = device_info['model']
@@ -138,6 +141,7 @@ def get_device_info(device_url):
             logging.info(f"Audioflow model {model} with name {name} discovered at {info[0]}")
         else:
             logging.info(f"Audioflow model {model} with name {name} found at {DEVICE_IP}")
+        client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'online', MQTT_QOS, True)
     except:
         logging.error('No Audioflow device found.')
         sys.exit()
@@ -148,50 +152,65 @@ def get_device_info(device_url):
 def get_one_zone(zone_no):
     """Get info about one zone and publish to MQTT"""
     try:
-        zones = requests.get(device_url + 'zones')
+        zones = requests.get(url=device_url + 'zones', timeout=timeout)
         zones = json.loads(zones.text)
-    except:
-        logging.error('Unable to communicate with Audioflow API: {e}')
+    except Exception as e:
+        logging.error(f'Unable to communicate with Audioflow device: {e}')
     
     try:
         client.publish(f'{BASE_TOPIC}/{serial_no}/{zone_no}/zone_state', str(zones['zones'][int(zone_no)-1]['state']), MQTT_QOS)
         client.publish(f'{BASE_TOPIC}/{serial_no}/{zone_no}/zone_enabled', str(zones['zones'][int(zone_no)-1]['enabled']), MQTT_QOS)
-    except:
-        logging.error('Unable to publish zone state: {e}')
+    except Exception as e:
+        logging.error(f'Unable to publish zone state: {e}')
 
 def get_all_zones():
-    """Get info about all zones and publish to MQTT"""
+    """Get info about all zones"""
+    global zones
+    global retry_count
     try:
-        zones = requests.get(device_url + 'zones')
+        zones = requests.get(url=device_url + 'zones', timeout=timeout)
         zones = json.loads(zones.text)
+        publish_all_zones()
+        if retry_count > 0:
+            logging.info('Reconnected to Audioflow device.')
+        retry_count = 0
+        client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'online', MQTT_QOS, True)
     except Exception as e:
-        logging.error('Unable to communicate with Audioflow API: {e}')
-    
+        logging.error(f'Unable to communicate with Audioflow device: {e}')
+        retry_count += 1
+        if retry_count > 2:
+            client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'offline', MQTT_QOS, True)
+            if retry_count < 4:
+                logging.warning('Audioflow device unreachable; marking as offline.')
+
+def publish_all_zones():
+    """Publish info about all zones to MQTT"""
+    global zones 
     try:
         for x in range(1,zone_count+1):
             client.publish(f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', str(zones['zones'][int(x)-1]['state']), MQTT_QOS)
             client.publish(f'{BASE_TOPIC}/{serial_no}/{x}/zone_enabled', str(zones['zones'][int(x)-1]['enabled']), MQTT_QOS)
     except Exception as e:
-        logging.error('Unable to publish all zone states: {e}')
+        logging.error(f'Unable to publish all zone states: {e}')
 
 def set_zone_state(zone_no, zone_state):
     """Change state of one zone"""
     data = states[zone_state]
     try:
         data = states[zone_state]
-        requests.put(device_url + 'zones/' + str(zone_no), data=str(data))
+        requests.put(url=device_url + 'zones/' + str(zone_no), data=str(data), timeout=timeout)
+        get_one_zone(zone_no) # Device does not send new state after state change, so we get the state and publish it to MQTT
     except Exception as e:
-        logging.error('Set zone state failed: {e}')
-    get_one_zone(zone_no) # Device does not send new state after state change, so we get the state and publish it to MQTT
+        logging.error(f'Set zone state failed: {e}')
 
 def set_zone_enable(zone_no, zone_enable): # WIP
     """Enable or disable zone"""
     try:
         # Audioflow device expects the zone name in the same payload when enabling/disabling zone, so we append the existing name here
-        requests.put(device_url + 'zonename/' + str(zone_no), data=str(str(zone_enable) + str(switch_names[int(zone_no)-1]).strip()))
+        requests.put(url=device_url + 'zonename/' + str(zone_no), data=str(str(zone_enable) + str(switch_names[int(zone_no)-1]).strip()), timeout=timeout)
+        get_one_zone(zone_no)
     except Exception as e:
-        logging.error('Enable/disable zone failed: {e}')
-    get_one_zone(zone_no)
+        logging.error(f'Enable/disable zone failed: {e}')
 
 def poll_device():
     """Poll for Audioflow device information every 10 seconds in case button(s) is/are pressed on device"""
@@ -206,9 +225,9 @@ def mqtt_discovery():
         try:
             for x in range(1,zone_count+1):
                 # Zone state entity (switch)
-                client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability_topic': 'audioflow2mqtt/status', 'name':f'{switch_names[x-1]} audio', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt'}), 1, True)
+                client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': 'audioflow2mqtt/status'},{'topic': f'audioflow2mqtt/{serial_no}/status'}], 'name':f'{switch_names[x-1]} audio', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:volume-high'}), 1, True)
                 # Zone enabled/disabled entity (switch)
-                client.publish(f'{ha_switch}{serial_no}/{x}e/config',json.dumps({'availability_topic': 'audioflow2mqtt/status', 'name':f'{switch_names[x-1]} audio zone enabled', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_enable', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_enabled', 'payload_on': '1', 'payload_off': '0', 'unique_id': f'{serial_no}{x}e', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt'}), 1, True)
+                client.publish(f'{ha_switch}{serial_no}/{x}e/config',json.dumps({'availability': [{'topic': 'audioflow2mqtt/status'},{'topic': f'audioflow2mqtt/{serial_no}/status'}], 'name':f'{switch_names[x-1]} audio zone enabled', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_enable', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_enabled', 'payload_on': '1', 'payload_off': '0', 'unique_id': f'{serial_no}{x}e', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt'}), 1, True)
         except Exception as e:
             print(f'Unable to publish: {e}')
 
