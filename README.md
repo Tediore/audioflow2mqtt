@@ -81,7 +81,7 @@ While audioflow2mqtt does support UDP discovery of Audioflow devices, creating a
 
 
 # TODO
-1. Handle Audioflow device disconnects/reconnects
+1. ~~Handle Audioflow device disconnects/reconnects~~
 2. Add support for re-discovery of Audioflow switch if its IP address changes
 3. Add support for multiple Audioflow switches? Not sure how many people would have more than one.
 4. You tell me!
