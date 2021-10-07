@@ -56,12 +56,16 @@ The examples below assume the base topic is the default (`audioflow2mqtt`) and t
 **Turn zone 2 on or off**
 
 Topic: `audioflow2mqtt/0123456789/2/set_zone_state`
+
 Payload: `on` or `off`
 
 **Enable or disable zone 1**
 
 Topic: `audioflow2mqtt/0123456789/1/set_zone_enable`
+
 Payload: `1` for enabled, `0` for disabled
+
+<br>
 
 When the zone state or enabled/disabled status is changed, audioflow2mqtt publishes the result to the following topics:
 
