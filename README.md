@@ -75,3 +75,8 @@ When the zone state or enabled/disabled status is changed, audioflow2mqtt publis
 
 <br>
 <a href="https://www.buymeacoffee.com/tediore" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
+
+
+# TODO
+1. Handle Audioflow device disconnects/reconnects
+2. You tell me!
