@@ -1,0 +1,17 @@
+  audioflow2mqtt:
+    container_name: audioflow2mqtt
+    image: audioflow2mqtt:latest
+    environment:
+    - MQTT_HOST=10.0.0.2
+    - MQTT_PORT=1883
+    - MQTT_USER=user
+    - MQTT_PASSWORD=password
+    - MQTT_CLIENT=audioflow2mqtt
+    - MQTT_QOS=1
+    - BASE_TOPIC=audioflow2mqtt
+    - HOME_ASSISTANT=True
+    - DEVICE_IP=10.0.1.100
+    - DISCOVERY_PORT=54321
+    - LOG_LEVEL=debug
+    restart: unless-stopped
+    network_mode: host
