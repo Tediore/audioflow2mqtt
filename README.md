@@ -11,7 +11,7 @@ version: '3'
 services:
   audioflow2mqtt:
     container_name: audioflow2mqtt
-    image: audioflow2mqtt:latest
+    image: tediore/audioflow2mqtt:latest
     environment:
     - MQTT_HOST=10.0.0.2
     - MQTT_PORT=1883
