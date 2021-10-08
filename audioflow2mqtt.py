@@ -147,7 +147,11 @@ def get_device_info(device_url):
         sys.exit()
     
     for x in range(1,zone_count+1):
-        switch_names.append(zone_info['zones'][int(x)-1]['name'])
+        zone_name = zone_info['zones'][int(x)-1]['name']
+        if zone_name == "":
+            switch_names.append(f'Zone {x}')
+        else:
+            switch_names.append(zone_info['zones'][int(x)-1]['name'])
 
 def get_one_zone(zone_no):
     """Get info about one zone and publish to MQTT"""
