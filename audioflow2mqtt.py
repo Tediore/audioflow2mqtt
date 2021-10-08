@@ -12,9 +12,9 @@ MQTT_HOST = os.getenv('MQTT_HOST')
 MQTT_PORT = int(os.getenv('MQTT_PORT', 1883))
 MQTT_USER = os.getenv('MQTT_USER')
 MQTT_PASSWORD = os.getenv('MQTT_PASSWORD')
-MQTT_CLIENT = os.getenv('MQTT_CLIENT', 'audioflow2mqtt')
-MQTT_QOS = int(os.getenv('MQTT_QOS', 1))
 BASE_TOPIC = os.getenv('BASE_TOPIC', 'audioflow2mqtt')
+MQTT_CLIENT = os.getenv('MQTT_CLIENT', BASE_TOPIC)
+MQTT_QOS = int(os.getenv('MQTT_QOS', 1))
 HOME_ASSISTANT = os.getenv('HOME_ASSISTANT', True)
 DEVICE_IP = os.getenv('DEVICE_IP')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
@@ -31,6 +31,7 @@ states = {
 }
 timeout = 3
 zones = ""
+zone_info = ""
 retry_count = 0
 
 client = mqtt_client.Client(MQTT_CLIENT)
@@ -126,6 +127,7 @@ def get_device_info(device_url):
     global serial_no
     global model
     global zone_count
+    global zone_info
     global name
     global switch_names
     try:
@@ -224,16 +226,18 @@ def poll_device():
 
 def mqtt_discovery():
     """Send Home Assistant MQTT discovery payloads"""
+    global zone_info
     if HOME_ASSISTANT:
         ha_switch = 'homeassistant/switch/'
         try:
             for x in range(1,zone_count+1):
                 # Zone state entity (switch)
-                client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': 'audioflow2mqtt/status'},{'topic': f'audioflow2mqtt/{serial_no}/status'}], 'name':f'{switch_names[x-1]} audio', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:volume-high'}), 1, True)
-                # Zone enabled/disabled entity (switch)
-                client.publish(f'{ha_switch}{serial_no}/{x}e/config',json.dumps({'availability': [{'topic': 'audioflow2mqtt/status'},{'topic': f'audioflow2mqtt/{serial_no}/status'}], 'name':f'{switch_names[x-1]} audio zone enabled', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_enable', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_enabled', 'payload_on': '1', 'payload_off': '0', 'unique_id': f'{serial_no}{x}e', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt'}), 1, True)
+                if zone_info['zones'][int(x)-1]['enabled'] == 0:
+                    client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{serial_no}/status'}], 'name':f'{switch_names[x-1]} speaker (Disabled)', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
+                else:
+                    client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{serial_no}/status'}], 'name':f'{switch_names[x-1]} speaker', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
         except Exception as e:
-            print(f'Unable to publish: {e}')
+            print(f'Unable to publish Home Assistant MQTT discovery payloads: {e}')
 
 if discovery:
     udp_discover = True
