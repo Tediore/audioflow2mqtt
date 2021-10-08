@@ -12,9 +12,8 @@ MQTT_HOST = os.getenv('MQTT_HOST')
 MQTT_PORT = int(os.getenv('MQTT_PORT', 1883))
 MQTT_USER = os.getenv('MQTT_USER')
 MQTT_PASSWORD = os.getenv('MQTT_PASSWORD')
-BASE_TOPIC = os.getenv('BASE_TOPIC', 'audioflow2mqtt')
-MQTT_CLIENT = os.getenv('MQTT_CLIENT', BASE_TOPIC)
 MQTT_QOS = int(os.getenv('MQTT_QOS', 1))
+BASE_TOPIC = os.getenv('BASE_TOPIC', 'audioflow2mqtt')
 HOME_ASSISTANT = os.getenv('HOME_ASSISTANT', True)
 DEVICE_IP = os.getenv('DEVICE_IP')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
@@ -34,7 +33,7 @@ zones = ""
 zone_info = ""
 retry_count = 0
 
-client = mqtt_client.Client(MQTT_CLIENT)
+client = mqtt_client.Client(BASE_TOPIC)
 
 if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
     logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
