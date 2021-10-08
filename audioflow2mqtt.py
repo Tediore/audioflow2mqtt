@@ -207,7 +207,7 @@ def set_zone_state(zone_no, zone_state):
     except Exception as e:
         logging.error(f'Set zone state failed: {e}')
 
-def set_zone_enable(zone_no, zone_enable): # WIP
+def set_zone_enable(zone_no, zone_enable):
     """Enable or disable zone"""
     try:
         # Audioflow device expects the zone name in the same payload when enabling/disabling zone, so we append the existing name here
