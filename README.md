@@ -15,9 +15,9 @@ services:
     - MQTT_PORT=1883
     - MQTT_USER=user
     - MQTT_PASSWORD=password
-    - MQTT_CLIENT=audioflow2mqtt
     - MQTT_QOS=1
     - BASE_TOPIC=audioflow2mqtt
+    - MQTT_CLIENT=audioflow2mqtt
     - HOME_ASSISTANT=True
     - DEVICE_IP=10.0.1.100
     - DISCOVERY_PORT=54321
@@ -33,9 +33,9 @@ services:
 | `MQTT_PORT` | `1883` | False | The port the MQTT broker is bound to. |
 | `MQTT_USER` | `None` | False | The user to send to the MQTT broker. |
 | `MQTT_PASSWORD` | `None` | False | The password to send to the MQTT broker. |
-| `MQTT_CLIENT` | `audioflow2mqtt` | True | The client name for the MQTT connection. |
 | `MQTT_QOS` | `1` | False | The MQTT QoS level. |
 | `BASE_TOPIC` | `audioflow2mqtt` | True | The topic prefix to use for all payloads. |
+| `MQTT_CLIENT` | `audioflow2mqtt` | `BASE_TOPIC` | The client name for the MQTT connection. |
 | `HOME_ASSISTANT` | `True` | False | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
 | `DEVICE_IP` | `None` | False | IP address of your Audioflow device. Not required if using UDP discovery. |
 | `DISCOVERY_PORT` | `54321` | False | The port to open on the host to send/receive UDP discovery packets. Required if `DEVICE_IP` is not set. |
@@ -72,7 +72,7 @@ When the zone state or enabled/disabled status is changed, audioflow2mqtt publis
 **Zone enabled/disabled:** `audioflow2mqtt/0123456789/ZONE/zone_enabled`
 
 # Important notes
-When running separate instances for multiple devices, you will need to set a **different base topic and MQTT client for each instance**. Also, while audioflow2mqtt does support UDP discovery of Audioflow devices, creating a DHCP reservation for your Audioflow device(s) and setting `DEVICE_IP` is recommended.
+When running separate instances for multiple devices, you will need to set a **different base topic and MQTT client for each instance**. Also, while audioflow2mqtt does support UDP discovery of Audioflow devices, creating a DHCP reservation for your Audioflow device(s) and setting `DEVICE_IP` is recommended. UDP discovery will only work if the Audioflow device is on the same subnet as the machine audioflow2mqtt is running on.
 
 <br>
 <a href="https://www.buymeacoffee.com/tediore" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
