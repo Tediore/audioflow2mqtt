@@ -71,8 +71,8 @@ When the zone state or enabled/disabled status is changed, audioflow2mqtt publis
 
 **Zone enabled/disabled:** `audioflow2mqtt/0123456789/ZONE/zone_enabled`
 
-# Other notes
-While audioflow2mqtt does support UDP discovery of Audioflow devices, creating a DHCP reservation for your Audioflow device and setting `DEVICE_IP` is recommended.
+# Important notes
+When running separate instances for multiple devices, you will need to set a **different base topic and MQTT client for each instance**. Also, while audioflow2mqtt does support UDP discovery of Audioflow devices, creating a DHCP reservation for your Audioflow device(s) and setting `DEVICE_IP` is recommended.
 
 <br>
 <a href="https://www.buymeacoffee.com/tediore" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
