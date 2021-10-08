@@ -47,17 +47,17 @@ audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for
 ![Home Assistant Device screenshot](ha_screenshot.png)
 
 # MQTT topic structure and examples
-The command topics start with `BASE_TOPIC/serial_number/zone_number/` where `BASE_TOPIC` is the base topic you define, `serial_number` is the device serial number (found on the sticker on the bottom of the device) and `zone_number` is the zone you want to control (starting from 1 on the left).
+The command topics start with `BASE_TOPIC/serial_number/zone_number/` where `BASE_TOPIC` is the base topic you define, `serial_number` is the device serial number (found on the sticker on the bottom of the device) and `zone_number` is the zone you want to control (zone A on the switch is zone number 1, zone B is zone number 2, and so on).
 
 The examples below assume the base topic is the default (`audioflow2mqtt`) and the serial number is `0123456789`.
 
-**Turn zone 2 on or off**
+**Turn zone B (zone number 2) on or off**
 
 Topic: `audioflow2mqtt/0123456789/2/set_zone_state`
 
 Payload: `on` or `off`
 
-**Enable or disable zone 1**
+**Enable or disable zone A (zone number 1)**
 
 Topic: `audioflow2mqtt/0123456789/1/set_zone_enable`
 
