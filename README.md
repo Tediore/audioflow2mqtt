@@ -27,22 +27,22 @@ services:
 ```
 
 # Configuration
-| Variable | Default | Required | Description |
-|----------|---------|----------|-------------|
-| `MQTT_HOST` | `None` | True | IP address or hostname of the MQTT broker to connect to. |
-| `MQTT_PORT` | `1883` | False | The port the MQTT broker is bound to. |
-| `MQTT_USER` | `None` | False | The user to send to the MQTT broker. |
-| `MQTT_PASSWORD` | `None` | False | The password to send to the MQTT broker. |
-| `MQTT_QOS` | `1` | False | The MQTT QoS level. |
-| `BASE_TOPIC` | `audioflow2mqtt` | True | The topic prefix to use for all payloads. |
-| `MQTT_CLIENT` | `audioflow2mqtt` | `BASE_TOPIC` | The client name for the MQTT connection. |
-| `HOME_ASSISTANT` | `True` | False | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
-| `DEVICE_IP` | `None` | False | IP address of your Audioflow device. Not required if using UDP discovery. |
-| `DISCOVERY_PORT` | `54321` | False | The port to open on the host to send/receive UDP discovery packets. Required if `DEVICE_IP` is not set. |
-| `LOG_LEVEL` | `info` | False | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `erro
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MQTT_HOST` | `None` | IP address or hostname of the MQTT broker to connect to. |
+| `MQTT_PORT` | `1883` | The port the MQTT broker is bound to. |
+| `MQTT_USER` | `None` | The user to send to the MQTT broker. |
+| `MQTT_PASSWORD` | `None` | The password to send to the MQTT broker. |
+| `MQTT_QOS` | `1` | The MQTT QoS level. |
+| `BASE_TOPIC` | `audioflow2mqtt` | The topic prefix to use for all payloads. |
+| `MQTT_CLIENT` | `[BASE_TOPIC]` | The client name for the MQTT connection. Defaults to the value for base topic. |
+| `HOME_ASSISTANT` | `True` | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
+| `DEVICE_IP` | `None` | IP address of your Audioflow device. |
+| `DISCOVERY_PORT` | `54321` | The port to open on the host to send/receive UDP discovery packets. Required if `DEVICE_IP` is not set. |
+| `LOG_LEVEL` | `info` | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error` |
 
 # Home Assistant
-audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for the Audioflow switch and entities for each zone and enabling/disabling zones.
+audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for the Audioflow switch and entities for each zone.
 
 ![Home Assistant Device screenshot](ha_screenshot.png)
 
