@@ -201,13 +201,16 @@ def publish_all_zones():
 
 def set_zone_state(zone_no, zone_state):
     """Change state of one zone"""
-    data = states[zone_state]
-    try:
-        data = states[zone_state]
-        requests.put(url=device_url + 'zones/' + str(zone_no), data=str(data), timeout=timeout)
-        get_one_zone(zone_no) # Device does not send new state after state change, so we get the state and publish it to MQTT
-    except Exception as e:
-        logging.error(f'Set zone state failed: {e}')
+    global zones
+    if zones['zones'][int(zone_no)-1]['enabled'] == 0:
+        logging.warning(f'Zone {zone_no} is disabled.')
+    else:
+        try:
+            data = states[zone_state]
+            requests.put(url=device_url + 'zones/' + str(zone_no), data=str(data), timeout=timeout)
+            get_one_zone(zone_no) # Device does not send new state after state change, so we get the state and publish it to MQTT
+        except Exception as e:
+            logging.error(f'Set zone state failed: {e}')
 
 def set_zone_enable(zone_no, zone_enable):
     """Enable or disable zone"""
@@ -233,9 +236,9 @@ def mqtt_discovery():
             for x in range(1,zone_count+1):
                 # Zone state entity (switch)
                 if zone_info['zones'][int(x)-1]['enabled'] == 0:
-                    client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{serial_no}/status'}], 'name':f'{switch_names[x-1]} speaker (Disabled)', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
+                    client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{serial_no}/status'}], 'name':f'{switch_names[x-1]} speakers (Disabled)', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
                 else:
-                    client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{serial_no}/status'}], 'name':f'{switch_names[x-1]} speaker', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
+                    client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{serial_no}/status'}], 'name':f'{switch_names[x-1]} speakers', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
         except Exception as e:
             print(f'Unable to publish Home Assistant MQTT discovery payloads: {e}')
 
@@ -262,4 +265,5 @@ else:
 mqtt_connect()
 polling_thread = t(target=poll_device)
 polling_thread.start()
+get_all_zones()
 client.loop_forever()
