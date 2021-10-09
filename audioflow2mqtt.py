@@ -32,19 +32,6 @@ states = ['off', 'on']
 
 client = mqtt_client.Client(BASE_TOPIC)
 
-if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
-    logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
-    logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default')
-else:
-    logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
-
-if DEVICE_IP != None:
-    logging.info('Device IP set; UDP discovery is disabled.')
-    discovery = False
-    device_ip = DEVICE_IP
-else:
-    logging.debug('No device IP set; UDP discovery is enabled.')
-
 def udp_discover_send():
     """Send discovery UDP packet to broadcast address"""
     ping = b'afping'
@@ -78,13 +65,14 @@ def udp_discover_receive():
         logging.error(f'Unable to bind port {DISCOVERY_PORT}: {e}')
         logging.error(f'Make sure nothing is currently using port {DISCOVERY_PORT}')
         sys.exit()
-    while udp_discover:
-        try:
-            data = sock.recvfrom(1024)
-            pong, info = data
-            pong = pong.decode('utf-8')
-        except AttributeError as e:
-            logging.debug(f"I don't know why this happens sometimes, but I don't want it crashing the program: {e}")
+    try:
+        data = sock.recvfrom(1024)
+        pong, info = data
+        pong = pong.decode('utf-8')
+    except AttributeError as e:
+        logging.debug(f"I don't know why this happens sometimes, but I don't want it crashing the program: {e}")
+    sleep(5)
+    sock.close()
 
 def mqtt_connect():
     """Connect to MQTT broker and set LWT"""
@@ -239,12 +227,13 @@ def set_all_zone_states(zone_state):
 
 def set_zone_enable(zone_no, zone_enable):
     """Enable or disable zone"""
-    try:
-        # Audioflow device expects the zone name in the same payload when enabling/disabling zone, so we append the existing name here
-        requests.put(url=device_url + 'zonename/' + str(zone_no), data=str(str(zone_enable) + str(switch_names[int(zone_no)-1]).strip()), timeout=timeout)
-        get_one_zone(zone_no)
-    except Exception as e:
-        logging.error(f'Enable/disable zone failed: {e}')
+    if int(zone_enable) in [0, 1]:
+        try:
+            # Audioflow device expects the zone name in the same payload when enabling/disabling zone, so we append the existing name here
+            requests.put(url=device_url + 'zonename/' + str(zone_no), data=str(str(zone_enable) + str(switch_names[int(zone_no)-1]).strip()), timeout=timeout)
+            get_one_zone(zone_no)
+        except Exception as e:
+            logging.error(f'Enable/disable zone failed: {e}')
 
 def poll_device():
     """Poll for Audioflow device information every 10 seconds in case button(s) is/are pressed on device"""
@@ -267,25 +256,37 @@ def mqtt_discovery():
         except Exception as e:
             print(f'Unable to publish Home Assistant MQTT discovery payloads: {e}')
 
-if discovery:
-    udp_discover = True
-    discover_rx = t(target=udp_discover_receive)
-    discover_rx.start()
-    udp_discover_send()
-    sleep(2)
+if MQTT_HOST == None:
+    logging.error('Please specify the IP address or hostname of your MQTT broker.')
+    sys.exit()
 
-if not discovery:
+if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
+    logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
+    logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default')
+else:
+    logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
+
+if DEVICE_IP != None:
+    logging.info('Device IP set; UDP discovery is disabled.')
+    discovery = False
+    device_ip = DEVICE_IP
     device_url = f'http://{DEVICE_IP}/'
     get_device_info(device_url)
-elif discovery and 'afpong' in pong:
-    device_url = f'http://{info[0]}/'
-    get_device_info(device_url)
-    device_ip = info[0]
-    udp_discover = False
-    logging.info('UDP discovery stopped')
 else:
-    logging.error('No Audioflow device found.')
-    sys.exit()
+    logging.info('No device IP set; UDP discovery is enabled.')
+    udp_discover_rx = t(target=udp_discover_receive)
+    udp_discover_rx.start()
+    udp_discover_send()
+    sleep(2)
+    if 'afpong' in pong:
+        device_url = f'http://{info[0]}/'
+        get_device_info(device_url)
+        device_ip = info[0]
+        logging.info('UDP discovery stopped')
+    else:
+        logging.error('No Audioflow device found.')
+        logging.error('Confirm that you have host networking enabled.')
+        sys.exit()
 
 mqtt_connect()
 get_all_zones()
