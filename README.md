@@ -72,9 +72,9 @@ Valid payloads: `1` for enabled, `0` for disabled
 
 When the zone state or enabled/disabled status is changed, audioflow2mqtt publishes the result to the following topics:
 
-**Zone state:** `audioflow2mqtt/0123456789/ZONE/zone_state`
+**Zone state:** `audioflow2mqtt/0123456789/zone_state/ZONE`
 
-**Zone enabled/disabled:** `audioflow2mqtt/0123456789/ZONE/zone_enabled`
+**Zone enabled/disabled:** `audioflow2mqtt/0123456789/zone_enabled/ZONE`
 
 # Important notes
 When running separate instances for multiple devices, you will need to set a **different base topic for each instance**. Also, while audioflow2mqtt does support UDP discovery of Audioflow devices, creating a DHCP reservation for your Audioflow device(s) and setting `DEVICE_IP` is recommended. UDP discovery will only work if the Audioflow device is on the same subnet as the machine audioflow2mqtt is running on.
