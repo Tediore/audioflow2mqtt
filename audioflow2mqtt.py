@@ -111,12 +111,12 @@ def on_message(client, userdata, msg):
     """Listen for MQTT payloads and forward to Audioflow device"""
     payload = msg.payload.decode('utf-8')
     topic = str(msg.topic)
-    switch_no = topic[topic.find('/set')-1]
-    if topic.endswith('set_zone_state'):
+    switch_no = topic[-1:]
+    if 'set_zone_state' in topic:
         set_zone_state(switch_no, payload)
-    elif topic.endswith('set_zone_enable'):
+    elif 'set_zone_enable' in topic:
         set_zone_enable(switch_no, payload)
-    elif topic.endswith('set_all_zone_states'):
+    elif 'set_all_zone_states' in topic:
         set_all_zone_states(payload)
 
 def get_device_info(device_url):
@@ -163,8 +163,8 @@ def get_one_zone(zone_no):
         logging.error(f'Unable to communicate with Audioflow device: {e}')
     
     try:
-        client.publish(f'{BASE_TOPIC}/{serial_no}/{zone_no}/zone_state', str(zones['zones'][int(zone_no)-1]['state']), MQTT_QOS)
-        client.publish(f'{BASE_TOPIC}/{serial_no}/{zone_no}/zone_enabled', str(zones['zones'][int(zone_no)-1]['enabled']), MQTT_QOS)
+        client.publish(f'{BASE_TOPIC}/{serial_no}/zone_state/{zone_no}', str(zones['zones'][int(zone_no)-1]['state']), MQTT_QOS)
+        client.publish(f'{BASE_TOPIC}/{serial_no}/zone_enabled/{zone_no}', str(zones['zones'][int(zone_no)-1]['enabled']), MQTT_QOS)
     except Exception as e:
         logging.error(f'Unable to publish zone state: {e}')
 
@@ -195,8 +195,8 @@ def publish_all_zones():
     global zones 
     try:
         for x in range(1,zone_count+1):
-            client.publish(f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', str(zones['zones'][int(x)-1]['state']), MQTT_QOS)
-            client.publish(f'{BASE_TOPIC}/{serial_no}/{x}/zone_enabled', str(zones['zones'][int(x)-1]['enabled']), MQTT_QOS)
+            client.publish(f'{BASE_TOPIC}/{serial_no}/zone_state/{x}', str(zones['zones'][int(x)-1]['state']), MQTT_QOS)
+            client.publish(f'{BASE_TOPIC}/{serial_no}/zone_enabled/{x}', str(zones['zones'][int(x)-1]['enabled']), MQTT_QOS)
     except Exception as e:
         logging.error(f'Unable to publish all zone states: {e}')
 
@@ -253,9 +253,9 @@ def mqtt_discovery():
             for x in range(1,zone_count+1):
                 # Zone state entity (switch)
                 if zone_info['zones'][int(x)-1]['enabled'] == 0:
-                    client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{serial_no}/status'}], 'name':f'{switch_names[x-1]} speakers (Disabled)', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
+                    client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{serial_no}/status'}], 'name':f'{switch_names[x-1]} speakers (Disabled)', 'command_topic':f'{BASE_TOPIC}/{serial_no}/set_zone_state/{x}', 'state_topic':f'{BASE_TOPIC}/{serial_no}/zone_state/{x}', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
                 else:
-                    client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{serial_no}/status'}], 'name':f'{switch_names[x-1]} speakers', 'command_topic':f'{BASE_TOPIC}/{serial_no}/{x}/set_zone_state', 'state_topic':f'{BASE_TOPIC}/{serial_no}/{x}/zone_state', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
+                    client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{serial_no}/status'}], 'name':f'{switch_names[x-1]} speakers', 'command_topic':f'{BASE_TOPIC}/{serial_no}/set_zone_state/{x}', 'state_topic':f'{BASE_TOPIC}/{serial_no}/zone_state/{x}', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{serial_no}{x}', 'device':{'name': f'{name}', 'identifiers': f'{serial_no}', 'manufacturer': 'Audioflow', 'model': f'{model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
         except Exception as e:
             print(f'Unable to publish Home Assistant MQTT discovery payloads: {e}')
 
