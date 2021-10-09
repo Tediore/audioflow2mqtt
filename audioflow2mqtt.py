@@ -274,7 +274,7 @@ if DEVICE_IP != None:
     get_device_info(device_url)
 else:
     logging.info('No device IP set; UDP discovery is enabled.')
-    udp_discover_rx = t(target=udp_discover_receive)
+    udp_discover_rx = t(target=udp_discover_receive, daemon=True)
     udp_discover_rx.start()
     udp_discover_send()
     sleep(2)
@@ -285,11 +285,11 @@ else:
         logging.info('UDP discovery stopped')
     else:
         logging.error('No Audioflow device found.')
-        logging.error('Confirm that you have host networking enabled.')
+        logging.error('Confirm that you have host networking enabled and that the Audioflow device is on the same subnet.')
         sys.exit()
 
 mqtt_connect()
 get_all_zones()
-polling_thread = t(target=poll_device)
+polling_thread = t(target=poll_device, daemon=True)
 polling_thread.start()
 client.loop_forever()
