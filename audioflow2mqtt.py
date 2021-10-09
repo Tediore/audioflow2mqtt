@@ -228,6 +228,8 @@ def set_all_zone_states(zone_state):
             requests.put(url=device_url + 'zones', data=str(data), timeout=timeout)
         except Exception as e:
             logging.error(f'Set all zone states failed: {e}')
+    elif zone_state == 'toggle':
+        logging.warning(f'Toggle command can only be used for one zone.')
     get_all_zones()
 
 def set_zone_enable(zone_no, zone_enable):
