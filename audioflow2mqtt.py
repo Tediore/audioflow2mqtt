@@ -24,14 +24,11 @@ device_ip = ""
 device_info = ""
 switch_names = []
 discovery = True
-states = {
-    'off': '0',
-    'on': '1'
-}
 timeout = 3
 zones = ""
 zone_info = ""
 retry_count = 0
+states = ['off', 'on']
 
 client = mqtt_client.Client(BASE_TOPIC)
 
@@ -107,7 +104,7 @@ def on_connect(client, userdata, flags, rc):
     logging.info('Connected to MQTT broker with result code ' + str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    client.subscribe(f'{BASE_TOPIC}/{serial_no}/' + '#')
+    client.subscribe(f'{BASE_TOPIC}/{serial_no}/#')
     mqtt_discovery()
 
 def on_message(client, userdata, msg):
@@ -119,6 +116,8 @@ def on_message(client, userdata, msg):
         set_zone_state(switch_no, payload)
     elif topic.endswith('set_zone_enable'):
         set_zone_enable(switch_no, payload)
+    elif topic.endswith('set_all_zone_states'):
+        set_all_zone_states(payload)
 
 def get_device_info(device_url):
     """Get info about Audioflow device"""
@@ -156,6 +155,7 @@ def get_device_info(device_url):
 
 def get_one_zone(zone_no):
     """Get info about one zone and publish to MQTT"""
+    global zones
     try:
         zones = requests.get(url=device_url + 'zones', timeout=timeout)
         zones = json.loads(zones.text)
@@ -181,12 +181,14 @@ def get_all_zones():
         retry_count = 0
         client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'online', MQTT_QOS, True)
     except Exception as e:
-        logging.error(f'Unable to communicate with Audioflow device: {e}')
+        if retry_count < 3:
+            logging.error(f'Unable to communicate with Audioflow device: {e}')
         retry_count += 1
         if retry_count > 2:
             client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'offline', MQTT_QOS, True)
             if retry_count < 4:
                 logging.warning('Audioflow device unreachable; marking as offline.')
+                logging.warning('Trying to reconnect every 10 sec in the background...')
 
 def publish_all_zones():
     """Publish info about all zones to MQTT"""
@@ -201,15 +203,31 @@ def publish_all_zones():
 def set_zone_state(zone_no, zone_state):
     """Change state of one zone"""
     global zones
+    global states
     if zones['zones'][int(zone_no)-1]['enabled'] == 0:
         logging.warning(f'Zone {zone_no} is disabled.')
     else:
         try:
-            data = states[zone_state]
+            current_state = zones['zones'][int(zone_no)-1]['state']
+            if zone_state in states:
+                data = states.index(zone_state)
+            elif zone_state == 'toggle':
+                data = 1 if current_state == 'off' else 0
             requests.put(url=device_url + 'zones/' + str(zone_no), data=str(data), timeout=timeout)
             get_one_zone(zone_no) # Device does not send new state after state change, so we get the state and publish it to MQTT
         except Exception as e:
             logging.error(f'Set zone state failed: {e}')
+
+def set_all_zone_states(zone_state):
+    """Turn all zones on or off"""
+    global states
+    if zone_state in states:
+        try:
+            data = '1 1 1 1' if zone_state == 'on' else '0 0 0 0'
+            requests.put(url=device_url + 'zones', data=str(data), timeout=timeout)
+        except Exception as e:
+            logging.error(f'Set all zone states failed: {e}')
+    get_all_zones()
 
 def set_zone_enable(zone_no, zone_enable):
     """Enable or disable zone"""
