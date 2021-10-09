@@ -208,16 +208,19 @@ def set_zone_state(zone_no, zone_state):
     if zones['zones'][int(zone_no)-1]['enabled'] == 0:
         logging.warning(f'Zone {zone_no} is disabled.')
     else:
-        try:
-            current_state = zones['zones'][int(zone_no)-1]['state']
-            if zone_state in states:
-                data = states.index(zone_state)
-            elif zone_state == 'toggle':
-                data = 1 if current_state == 'off' else 0
-            requests.put(url=device_url + 'zones/' + str(zone_no), data=str(data), timeout=timeout)
-            get_one_zone(zone_no) # Device does not send new state after state change, so we get the state and publish it to MQTT
-        except Exception as e:
-            logging.error(f'Set zone state failed: {e}')
+        if zone_state in ['on', 'off', 'toggle']:
+            try:
+                current_state = zones['zones'][int(zone_no)-1]['state']
+                if zone_state in states:
+                    data = states.index(zone_state)
+                else:
+                    data = 1 if current_state == 'off' else 0
+                requests.put(url=device_url + 'zones/' + str(zone_no), data=str(data), timeout=timeout)
+                get_one_zone(zone_no) # Device does not send new state after state change, so we get the new state and publish it to MQTT
+            except Exception as e:
+                logging.error(f'Set zone state failed: {e}')
+        else:
+            logging.warning(f'"{zone_state}" is not a valid command. Valid commands are on, off, toggle')
 
 def set_all_zone_states(zone_state):
     """Turn all zones on or off"""
@@ -226,11 +229,13 @@ def set_all_zone_states(zone_state):
         try:
             data = '1 1 1 1' if zone_state == 'on' else '0 0 0 0'
             requests.put(url=device_url + 'zones', data=str(data), timeout=timeout)
+            get_all_zones() # Device does not send new state after state change, so we get the new state and publish it to MQTT
         except Exception as e:
             logging.error(f'Set all zone states failed: {e}')
     elif zone_state == 'toggle':
         logging.warning(f'Toggle command can only be used for one zone.')
-    get_all_zones()
+    else:
+        logging.warning(f'"{zone_state}" is not a valid command. Valid commands are on, off')
 
 def set_zone_enable(zone_no, zone_enable):
     """Enable or disable zone"""
