@@ -113,11 +113,12 @@ def on_message(client, userdata, msg):
     topic = str(msg.topic)
     switch_no = topic[-1:]
     if 'set_zone_state' in topic:
-        set_zone_state(switch_no, payload)
+        if topic.endswith('e'): # if no zone number is present in topic
+            set_all_zone_states(payload)
+        else:
+            set_zone_state(switch_no, payload)
     elif 'set_zone_enable' in topic:
         set_zone_enable(switch_no, payload)
-    elif 'set_all_zone_states' in topic:
-        set_all_zone_states(payload)
 
 def get_device_info(device_url):
     """Get info about Audioflow device"""
@@ -138,9 +139,9 @@ def get_device_info(device_url):
         zone_count = int(model[-2:-1]) # Second to last character in device model name shows zone count
         name = device_info['name']
         if discovery:
-            logging.info(f"Audioflow model {model} with name {name} discovered at {info[0]}")
+            logging.info(f"Audioflow model {model} with name {name} and serial number {serial_no} discovered at {info[0]}")
         else:
-            logging.info(f"Audioflow model {model} with name {name} found at {DEVICE_IP}")
+            logging.info(f"Audioflow model {model} with name {name} and serial number {serial_no} found at {DEVICE_IP}")
         client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'online', MQTT_QOS, True)
     except:
         logging.error('No Audioflow device found.')
@@ -280,7 +281,7 @@ else:
     sys.exit()
 
 mqtt_connect()
+get_all_zones()
 polling_thread = t(target=poll_device)
 polling_thread.start()
-get_all_zones()
 client.loop_forever()
