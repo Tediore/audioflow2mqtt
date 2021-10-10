@@ -65,7 +65,7 @@ class NetworkDiscovery:
         sleep(5)
         self.sock.close()
 
-class Device:
+class AudioflowDevice:
     def __init__(self):
         self.zone_count = 0
         self.switch_names = []
@@ -250,7 +250,7 @@ if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
 else:
     logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
 
-d = Device()
+d = AudioflowDevice()
 n = NetworkDiscovery()
 
 if DEVICE_IP != None:
