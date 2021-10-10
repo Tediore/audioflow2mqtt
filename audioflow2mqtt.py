@@ -86,6 +86,7 @@ class AudioflowDevice:
             self.model = self.device_info['model']
             self.zone_count = int(self.model[-2:-1]) # Second to last character in device model name shows zone count
             self.name = self.device_info['name']
+            self.fw_version = self.device_info['version']
             if nwk_discovery:
                 logging.info(f"Audioflow model {self.model} with name {self.name} and serial number {self.serial_no} discovered at {n.info[0]}")
             else:
@@ -202,10 +203,27 @@ class AudioflowDevice:
             ha_switch = 'homeassistant/switch/'
             try:
                 for x in range(1,self.zone_count+1):
-                    if self.zone_info['zones'][int(x)-1]['enabled'] == 0:
-                        client.publish(f'{ha_switch}{self.serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{self.serial_no}/status'}], 'name':f'{self.switch_names[x-1]} speakers (Disabled)', 'command_topic':f'{BASE_TOPIC}/{self.serial_no}/set_zone_state/{x}', 'state_topic':f'{BASE_TOPIC}/{self.serial_no}/zone_state/{x}', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{self.serial_no}{x}', 'device':{'name': f'{self.name}', 'identifiers': f'{self.serial_no}', 'manufacturer': 'Audioflow', 'model': f'{self.model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
-                    else:
-                        client.publish(f'{ha_switch}{self.serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{self.serial_no}/status'}], 'name':f'{self.switch_names[x-1]} speakers', 'command_topic':f'{BASE_TOPIC}/{self.serial_no}/set_zone_state/{x}', 'state_topic':f'{BASE_TOPIC}/{self.serial_no}/zone_state/{x}', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{self.serial_no}{x}', 'device':{'name': f'{self.name}', 'identifiers': f'{self.serial_no}', 'manufacturer': 'Audioflow', 'model': f'{self.model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
+                    name_suffix = 'Disabled' if self.zone_info['zones'][int(x)-1]['enabled'] == 0 else '' # append "(Disabled)" to the end of the default entity name if zone is disabled
+                    client.publish(f'{ha_switch}{self.serial_no}/{x}/config',json.dumps({
+                        'availability': [
+                            {'topic': f'{BASE_TOPIC}/status'},
+                            {'topic': f'{BASE_TOPIC}/{self.serial_no}/status'}
+                            ], 
+                        'name': f'{self.switch_names[x-1]} speakers {name_suffix}', 
+                        'command_topic': f'{BASE_TOPIC}/{self.serial_no}/set_zone_state/{x}', 
+                        'state_topic': f'{BASE_TOPIC}/{self.serial_no}/zone_state/{x}', 
+                        'payload_on': 'on', 
+                        'payload_off': 'off', 
+                        'unique_id': f'{self.serial_no}{x}', 
+                        'device': {
+                            'name': f'{self.name}', 
+                            'identifiers': f'{self.serial_no}', 
+                            'manufacturer': 'Audioflow', 
+                            'model': f'{self.model}', 
+                            'sw_version': f'{self.fw_version}'}, 
+                            'platform': 'mqtt', 
+                            'icon': 'mdi:speaker'
+                            }), 1, True)
             except Exception as e:
                 print(f'Unable to publish Home Assistant MQTT discovery payloads: {e}')
 
