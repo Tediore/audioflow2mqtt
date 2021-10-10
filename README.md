@@ -45,29 +45,36 @@ audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for
 ![Home Assistant Device screenshot](ha_screenshot.png)
 
 # MQTT topic structure and examples
-The command topics start with `BASE_TOPIC/serial_number/zone_number/` where `BASE_TOPIC` is the base topic you define, `serial_number` is the device serial number (found on the sticker on the bottom of the device) and `zone_number` is the zone you want to control (zone A on the switch is zone number 1, zone B is zone number 2, and so on).
+The command topic syntax is `BASE_TOPIC/serial_number/command/zone_number` where `BASE_TOPIC` is the base topic you define, `serial_number` is the device serial number (found on the sticker on the bottom of the device), `command` is one of the below commands, and `zone_number` is the zone you want to control (zone A on the switch is zone number 1, zone B is zone number 2, and so on).
 
-The examples below assume the base topic is the default (`audioflow2mqtt`) and the serial number is `0123456789`.
+Valid commands are `set_zone_state` and `set_zone_enable`. The examples below assume the base topic is the default (`audioflow2mqtt`) and the serial number is `0123456789`.
 
-**Turn zone B (zone number 2) on or off**
+**Turn zone B (zone number 2) on or off, or toggle between states**
 
-Topic: `audioflow2mqtt/0123456789/2/set_zone_state`
+Topic: `audioflow2mqtt/0123456789/set_zone_state/2`
 
-Payload: `on` or `off`
+Valid payloads: `on`, `off`, `toggle`
+
+**Turn all zones on or off**
+
+Topic: `audioflow2mqtt/0123456789/set_zone_state` (note the lack of a zone number at the end of the topic)
+
+Valid payloads: `on`, `off`
 
 **Enable or disable zone A (zone number 1)**
+_This might not really be something you would need, but I figured I'd add it anyway_
 
-Topic: `audioflow2mqtt/0123456789/1/set_zone_enable`
+Topic: `audioflow2mqtt/0123456789/set_zone_enable/1`
 
-Payload: `1` for enabled, `0` for disabled
+Valid payloads: `1` for enabled, `0` for disabled
 
 <br>
 
 When the zone state or enabled/disabled status is changed, audioflow2mqtt publishes the result to the following topics:
 
-**Zone state:** `audioflow2mqtt/0123456789/ZONE/zone_state`
+**Zone state:** `audioflow2mqtt/0123456789/zone_state/ZONE`
 
-**Zone enabled/disabled:** `audioflow2mqtt/0123456789/ZONE/zone_enabled`
+**Zone enabled/disabled:** `audioflow2mqtt/0123456789/zone_enabled/ZONE`
 
 # Important notes
 When running separate instances for multiple devices, you will need to set a **different base topic for each instance**. Also, while audioflow2mqtt does support UDP discovery of Audioflow devices, creating a DHCP reservation for your Audioflow device(s) and setting `DEVICE_IP` is recommended. UDP discovery will only work if the Audioflow device is on the same subnet as the machine audioflow2mqtt is running on.
