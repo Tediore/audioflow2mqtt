@@ -49,6 +49,7 @@ class NetworkDiscovery:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.pong = ""
+
         try:
             self.sock.bind(('0.0.0.0', DISCOVERY_PORT))
             logging.debug(f'Opening port {DISCOVERY_PORT}')
@@ -56,6 +57,7 @@ class NetworkDiscovery:
             logging.error(f'Unable to bind port {DISCOVERY_PORT}: {e}')
             logging.error(f'Make sure nothing is currently using port {DISCOVERY_PORT}')
             sys.exit()
+
         try:
             data = self.sock.recvfrom(1024)
             self.pong, self.info = data
@@ -145,7 +147,9 @@ class AudioflowDevice:
 
     def set_zone_state(self, zone_no, zone_state):
         """Change state of one zone"""
-        if self.zones['zones'][int(zone_no)-1]['enabled'] == 0:
+        if int(zone_no) > self.zone_count:
+            logging.warning(f'{zone_no} is an invalid zone number.')
+        elif self.zones['zones'][int(zone_no)-1]['enabled'] == 0:
             logging.warning(f'Zone {zone_no} is disabled.')
         else:
             if zone_state in ['on', 'off', 'toggle']:
@@ -156,7 +160,7 @@ class AudioflowDevice:
                     else:
                         data = 1 if current_state == 'off' else 0
                     requests.put(url=device_url + 'zones/' + str(zone_no), data=str(data), timeout=self.timeout)
-                    d.get_one_zone(zone_no=zone_no) # Device does not send new state after state change, so we get the new state and publish it to MQTT
+                    d.get_one_zone(zone_no) # Device does not send new state after state change, so we get the new state and publish it to MQTT
                 except Exception as e:
                     logging.error(f'Set zone state failed: {e}')
             else:
@@ -182,7 +186,7 @@ class AudioflowDevice:
             try:
                 # Audioflow device expects the zone name in the same payload when enabling/disabling zone, so we append the existing name here
                 requests.put(url=device_url + 'zonename/' + str(zone_no), data=str(str(zone_enable) + str(self.switch_names[int(zone_no)-1]).strip()), timeout=self.timeout)
-                d.get_one_zone(zone_no=zone_no)
+                d.get_one_zone(zone_no)
             except Exception as e:
                 logging.error(f'Enable/disable zone failed: {e}')
 
@@ -198,7 +202,6 @@ class AudioflowDevice:
             ha_switch = 'homeassistant/switch/'
             try:
                 for x in range(1,self.zone_count+1):
-                    # Zone state entity (switch)
                     if self.zone_info['zones'][int(x)-1]['enabled'] == 0:
                         client.publish(f'{ha_switch}{self.serial_no}/{x}/config',json.dumps({'availability': [{'topic': f'{BASE_TOPIC}/status'},{'topic': f'{BASE_TOPIC}/{self.serial_no}/status'}], 'name':f'{self.switch_names[x-1]} speakers (Disabled)', 'command_topic':f'{BASE_TOPIC}/{self.serial_no}/set_zone_state/{x}', 'state_topic':f'{BASE_TOPIC}/{self.serial_no}/zone_state/{x}', 'payload_on': 'on', 'payload_off': 'off', 'unique_id': f'{self.serial_no}{x}', 'device':{'name': f'{self.name}', 'identifiers': f'{self.serial_no}', 'manufacturer': 'Audioflow', 'model': f'{self.model}'}, 'platform': 'mqtt', 'icon': 'mdi:speaker'}), 1, True)
                     else:
@@ -234,11 +237,11 @@ def on_message(client, userdata, msg):
     switch_no = topic[-1:]
     if 'set_zone_state' in topic:
         if topic.endswith('e'): # if no zone number is present in topic
-            d.set_all_zone_states(zone_state=payload)
+            d.set_all_zone_states(payload)
         else:
-            d.set_zone_state(zone_no=switch_no, zone_state=payload)
+            d.set_zone_state(switch_no, payload)
     elif 'set_zone_enable' in topic:
-        d.set_zone_enable(zone_no=switch_no, zone_enable=payload)
+        d.set_zone_enable(switch_no, payload)
 
 if MQTT_HOST == None:
     logging.error('Please specify the IP address or hostname of your MQTT broker.')
@@ -258,7 +261,7 @@ if DEVICE_IP != None:
     nwk_discovery = False
     device_ip = DEVICE_IP
     device_url = f'http://{DEVICE_IP}/'
-    d.get_device_info(device_url=device_url)
+    d.get_device_info(device_url)
 else:
     nwk_discovery = True
     logging.info('No device IP set; network discovery is enabled.')
@@ -268,7 +271,7 @@ else:
     sleep(2)
     if 'afpong' in n.pong:
         device_url = f'http://{n.info[0]}/'
-        d.get_device_info(device_url=device_url)
+        d.get_device_info(device_url)
         device_ip = n.info[0]
         logging.info('Network discovery stopped')
     else:
