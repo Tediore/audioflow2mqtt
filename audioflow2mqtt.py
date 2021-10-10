@@ -203,7 +203,7 @@ class AudioflowDevice:
             ha_switch = 'homeassistant/switch/'
             try:
                 for x in range(1,self.zone_count+1):
-                    name_suffix = ' Disabled' if self.zone_info['zones'][int(x)-1]['enabled'] == 0 else '' # append "(Disabled)" to the end of the default entity name if zone is disabled
+                    name_suffix = ' (Disabled)' if self.zone_info['zones'][int(x)-1]['enabled'] == 0 else '' # append "(Disabled)" to the end of the default entity name if zone is disabled
                     client.publish(f'{ha_switch}{self.serial_no}/{x}/config',json.dumps({
                         'availability': [
                             {'topic': f'{BASE_TOPIC}/status'},
