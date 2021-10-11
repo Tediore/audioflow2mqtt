@@ -35,7 +35,18 @@ services:
 
 Example `docker run` command:
 ```
-docker run --name audioflow2mqtt -e MQTT_HOST=10.0.0.2 -e MQTT_PORT=1883 -e MQTT_USER=user -e MQTT_PASSWORD=password -e MQTT_QOS=1 -e BASE_TOPIC=audioflow2mqtt -e HOME_ASSISTANT=True -e DEVICE_IP=10.0.1.100 -e LOG_LEVEL=debug --network host tediore/audioflow2mqtt:latest
+docker run --name audioflow2mqtt \
+-e MQTT_HOST=10.0.0.2 \
+-e MQTT_PORT=1883 \
+-e MQTT_USER=user \
+-e MQTT_PASSWORD=password \
+-e MQTT_QOS=1 \
+-e BASE_TOPIC=audioflow2mqtt \
+-e HOME_ASSISTANT=True \
+-e DEVICE_IP=10.0.1.100 \
+-e LOG_LEVEL=debug \
+--network host \
+tediore/audioflow2mqtt:latest
 ```
 
 <br>
