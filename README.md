@@ -68,7 +68,7 @@ tediore/audioflow2mqtt:latest
 | `MQTT_PASSWORD` | None | False | The password to send to the MQTT broker. |
 | `MQTT_QOS` | 1 | False | The MQTT QoS level. |
 | `BASE_TOPIC` | audioflow2mqtt | True | The topic prefix to use for all payloads. |
-| `HOME_ASSISTANT` | True | True | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
+| `HOME_ASSISTANT` | True | False | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
 | `DEVICE_IP` | None | Depends* | IP address of your Audioflow device. <br>\* Required if you don't plan to use UDP discovery. |
 | `DISCOVERY_PORT` | 54321 | False | The port to open on the host to send/receive UDP discovery packets. |
 | `LOG_LEVEL` | info | False | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error` |
