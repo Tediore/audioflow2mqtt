@@ -6,7 +6,7 @@ audioflow2mqtt enables local control of your Audioflow speaker switch via MQTT. 
 
 **Docker via `docker-compose`**
 
-1. Create your docker-compose.yaml (or add to existing). An example docker-compose.yaml with all possible environmental variables is shown below.
+1. Create your docker-compose.yaml (or add to existing). Example docker-compose.yaml with all environmental variables:
 ```yaml
 version: '3'
 services:
@@ -33,7 +33,7 @@ services:
 
 **Docker via `docker run`**
 
-Example `docker run` command:
+Example `docker run` command with all environment variables:
 ```
 docker run --name audioflow2mqtt \
 -e MQTT_HOST=10.0.0.2 \
@@ -60,18 +60,18 @@ tediore/audioflow2mqtt:latest
 <br>
 
 # Configuration
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MQTT_HOST` | None | IP address or hostname of the MQTT broker to connect to. |
-| `MQTT_PORT` | 1883 | The port the MQTT broker is bound to. |
-| `MQTT_USER` | None | The user to send to the MQTT broker. |
-| `MQTT_PASSWORD` | None | The password to send to the MQTT broker. |
-| `MQTT_QOS` | 1 | The MQTT QoS level. |
-| `BASE_TOPIC` | audioflow2mqtt | The topic prefix to use for all payloads. |
-| `HOME_ASSISTANT` | True | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
-| `DEVICE_IP` | None | IP address of your Audioflow device. Only required if you don't plan to use UDP discovery. |
-| `DISCOVERY_PORT` | 54321 | The port to open on the host to send/receive UDP discovery packets. |
-| `LOG_LEVEL` | info | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error` |
+| Variable | Default | Required | Description |
+|----------|---------|----------|-------------|
+| `MQTT_HOST` | None | True |IP address or hostname of the MQTT broker to connect to. |
+| `MQTT_PORT` | 1883 | True | The port the MQTT broker is bound to. |
+| `MQTT_USER` | None | False | The user to send to the MQTT broker. |
+| `MQTT_PASSWORD` | None | False | The password to send to the MQTT broker. |
+| `MQTT_QOS` | 1 | False | The MQTT QoS level. |
+| `BASE_TOPIC` | audioflow2mqtt | True | The topic prefix to use for all payloads. |
+| `HOME_ASSISTANT` | True | True | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
+| `DEVICE_IP` | None | Depends* | IP address of your Audioflow device. <br>\* Required if you don't plan to use UDP discovery. |
+| `DISCOVERY_PORT` | 54321 | False | The port to open on the host to send/receive UDP discovery packets. |
+| `LOG_LEVEL` | info | False | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error` |
 
 <br>
 
