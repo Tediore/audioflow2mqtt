@@ -231,11 +231,11 @@ def mqtt_connect():
     """Connect to MQTT broker and set LWT"""
     try:
         client.username_pw_set(MQTT_USER, MQTT_PASSWORD)
-        client.will_set('audioflow2mqtt/status', 'offline', 1, True)
+        client.will_set(f'{BASE_TOPIC}/status', 'offline', 1, True)
         client.on_connect = on_connect
         client.on_message = on_message
         client.connect(MQTT_HOST, MQTT_PORT)
-        client.publish('audioflow2mqtt/status', 'online', 1, True)
+        client.publish(f'{BASE_TOPIC}/status', 'online', 1, True)
     except Exception as e:
         logging.error(f'Unable to connect to MQTT broker: {e}')
         sys.exit()
@@ -297,8 +297,9 @@ else:
         logging.error('Confirm that you have host networking enabled and that the Audioflow device is on the same subnet.')
         sys.exit()
 
-mqtt_connect()
-d.get_all_zones()
-polling_thread = t(target=d.poll_device, daemon=True)
-polling_thread.start()
-client.loop_forever()
+if __name__ == '__main__':
+    mqtt_connect()
+    d.get_all_zones()
+    polling_thread = t(target=d.poll_device, daemon=True)
+    polling_thread.start()
+    client.loop_forever()
