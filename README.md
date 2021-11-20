@@ -47,7 +47,7 @@ docker run --name audioflow2mqtt -e MQTT_HOST=10.0.0.2 -e MQTT_PORT=1883 -e MQTT
 | `MQTT_QOS` | 1 | The MQTT QoS level. |
 | `BASE_TOPIC` | audioflow2mqtt | The topic prefix to use for all payloads. |
 | `HOME_ASSISTANT` | True | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
-| `DEVICE_IPS` | None | IP address(es) of your Audioflow device(s). Only required if you don't plan to use UDP discovery. |
+| `DEVICE_IPS` | None | IP address(es) of your Audioflow device(s). Must be a comma-separated string. Only required if you don't plan to use UDP discovery. |
 | `DISCOVERY_PORT` | 54321 | The port to open on the host to send/receive UDP discovery packets. |
 | `LOG_LEVEL` | info | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error` |
 
