@@ -1,6 +1,8 @@
 # Audioflow to MQTT Gateway
 
-audioflow2mqtt enables local control of your Audioflow speaker switch via MQTT. It supports Home Assistant MQTT discovery for easy integration. It can also automatically discover the Audioflow device on your network via UDP discovery, or you can specify the IP address of the Audioflow device if you don't want to use UDP discovery. Currently only supports one Audioflow device unless you run separate instances (see the "important notes" section at the end of the readme for details).
+audioflow2mqtt enables local control of your Audioflow speaker switch via MQTT. It supports Home Assistant MQTT discovery for easy integration. It can also automatically discover the Audioflow device on your network via UDP discovery, or you can specify the IP address of the Audioflow device if you don't want to use UDP discovery.
+
+Initial support for multiple devices has been added. I can't test it out since I don't have multiple Audioflow switches, but it should work. UDP discovery does *not* currently work, however, so you'll need to specify the IP addresses.
 
 # How to run
 
@@ -21,7 +23,7 @@ services:
     - MQTT_QOS=1
     - BASE_TOPIC=audioflow2mqtt
     - HOME_ASSISTANT=True
-    - DEVICE_IP=10.0.1.100
+    - DEVICE_IPS=10.0.1.100,10.0.1.101
     - DISCOVERY_PORT=54321
     - LOG_LEVEL=debug
     restart: unless-stopped
@@ -32,7 +34,7 @@ services:
 
 Example `docker run` command:
 ```
-docker run --name audioflow2mqtt -e MQTT_HOST=10.0.0.2 -e MQTT_PORT=1883 -e MQTT_USER=user -e MQTT_PASSWORD=password -e MQTT_QOS=1 -e BASE_TOPIC=audioflow2mqtt -e HOME_ASSISTANT=True -e DEVICE_IP=10.0.1.100 -e LOG_LEVEL=debug --network host tediore/audioflow2mqtt:latest
+docker run --name audioflow2mqtt -e MQTT_HOST=10.0.0.2 -e MQTT_PORT=1883 -e MQTT_USER=user -e MQTT_PASSWORD=password -e MQTT_QOS=1 -e BASE_TOPIC=audioflow2mqtt -e HOME_ASSISTANT=True -e DEVICE_IPS=10.0.1.100,10.0.1.101 -e LOG_LEVEL=debug --network host tediore/audioflow2mqtt:latest
 ```
 
 # Configuration
@@ -45,7 +47,7 @@ docker run --name audioflow2mqtt -e MQTT_HOST=10.0.0.2 -e MQTT_PORT=1883 -e MQTT
 | `MQTT_QOS` | 1 | The MQTT QoS level. |
 | `BASE_TOPIC` | audioflow2mqtt | The topic prefix to use for all payloads. |
 | `HOME_ASSISTANT` | True | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
-| `DEVICE_IP` | None | IP address of your Audioflow device. Only required if you don't plan to use UDP discovery. |
+| `DEVICE_IPS` | None | IP address(es) of your Audioflow device(s). Only required if you don't plan to use UDP discovery. |
 | `DISCOVERY_PORT` | 54321 | The port to open on the host to send/receive UDP discovery packets. |
 | `LOG_LEVEL` | info | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error` |
 
