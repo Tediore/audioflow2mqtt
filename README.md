@@ -2,7 +2,7 @@
 
 audioflow2mqtt enables local control of your Audioflow speaker switch via MQTT. It supports Home Assistant MQTT discovery for easy integration. It can also automatically discover the Audioflow device on your network via UDP discovery, or you can specify the IP address of the Audioflow device if you don't want to use UDP discovery.
 
-Initial support for multiple devices has been added. I can't test it out since I don't have multiple Audioflow switches, but it should work. UDP discovery does *not* currently work, however, so you'll need to specify the IP addresses.
+Initial support for multiple devices has been added. I can't test it out since I don't have multiple Audioflow switches, but it should work.
 
 # How to run
 
