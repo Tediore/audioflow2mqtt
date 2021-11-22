@@ -63,7 +63,7 @@ class NetworkDiscovery:
                 self.pong, self.info = self.sock.recvfrom(1024)
                 self.pong = self.pong.decode('utf-8')
         except Exception as e:
-            print(f'Unable to receive:{e}')
+            print(f'Unable to receive: {e}')
         sleep(5)
         self.sock.close()
 
