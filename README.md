@@ -4,8 +4,6 @@ audioflow2mqtt enables local control of your Audioflow speaker switch via MQTT. 
 
 Initial support for multiple devices has been added. I can't test it out since I don't have multiple Audioflow switches, but it should work.
 
-**Initial support for multiple Audioflow switches has been added to the dev branch.**
-
 # How to run
 
 **Docker via `docker-compose`**
