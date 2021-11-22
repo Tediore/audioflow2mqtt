@@ -1,6 +1,8 @@
 # Audioflow to MQTT Gateway
 
-audioflow2mqtt enables local control of your Audioflow speaker switch via MQTT. It supports Home Assistant MQTT discovery for easy integration. It can also automatically discover the Audioflow device on your network via UDP discovery, or you can specify the IP address of the Audioflow device if you don't want to use UDP discovery. Currently only supports one Audioflow device unless you run separate instances (see the "important notes" section at the end of the readme for details).
+audioflow2mqtt enables local control of your Audioflow speaker switch via MQTT. It supports Home Assistant MQTT discovery for easy integration. It can also automatically discover the Audioflow device on your network via UDP discovery, or you can specify the IP address of the Audioflow device if you don't want to use UDP discovery.
+
+Initial support for multiple devices has been added. I can't test it out since I don't have multiple Audioflow switches, but it should work.
 
 **Initial support for multiple Audioflow switches has been added to the dev branch.**
 
@@ -23,7 +25,7 @@ services:
     - MQTT_QOS=1
     - BASE_TOPIC=audioflow2mqtt
     - HOME_ASSISTANT=True
-    - DEVICE_IP=10.0.1.100
+    - DEVICE_IPS=10.0.1.100,10.0.1.101
     - DISCOVERY_PORT=54321
     - LOG_LEVEL=debug
     restart: unless-stopped
@@ -45,7 +47,7 @@ docker run --name audioflow2mqtt \
 -e MQTT_QOS=1 \
 -e BASE_TOPIC=audioflow2mqtt \
 -e HOME_ASSISTANT=True \
--e DEVICE_IP=10.0.1.100 \
+-e DEVICE_IP=10.0.1.100,10.0.1.101 \
 -e LOG_LEVEL=debug \
 --network host \
 tediore/audioflow2mqtt:latest
@@ -71,7 +73,7 @@ tediore/audioflow2mqtt:latest
 | `MQTT_QOS` | 1 | False | The MQTT QoS level. |
 | `BASE_TOPIC` | audioflow2mqtt | True | The topic prefix to use for all payloads. |
 | `HOME_ASSISTANT` | True | False | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
-| `DEVICE_IP` | None | Depends* | IP address of your Audioflow device. <br>\* Required if you don't plan to use UDP discovery. |
+| `DEVICE_IPS` | None | Depends* | IP address(es) of your Audioflow device(s). Must be a comma-separated string (if multiple). <br>\* Required if you don't plan to use UDP discovery. |
 | `DISCOVERY_PORT` | 54321 | False | The port to open on the host to send/receive UDP discovery packets. |
 | `LOG_LEVEL` | info | False | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error` |
 
@@ -129,5 +131,5 @@ When running separate instances for multiple devices, you will need to set a **d
 # TODO
 1. ~~Handle Audioflow device disconnects/reconnects~~
 2. Add support for re-discovery of Audioflow switch if its IP address changes
-3. Add support for multiple Audioflow switches? Not sure how many people would have more than one.
+3. ~~Add support for multiple Audioflow switches? Not sure how many people would have more than one.~~
 4. You tell me!

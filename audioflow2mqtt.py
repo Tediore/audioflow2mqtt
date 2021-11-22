@@ -15,7 +15,7 @@ MQTT_PASSWORD = os.getenv('MQTT_PASSWORD')
 MQTT_QOS = int(os.getenv('MQTT_QOS', 1))
 BASE_TOPIC = os.getenv('BASE_TOPIC', 'audioflow2mqtt')
 HOME_ASSISTANT = os.getenv('HOME_ASSISTANT', True)
-DEVICE_IP = os.getenv('DEVICE_IP')
+DEVICE_IPS = os.getenv('DEVICE_IPS')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 DISCOVERY_PORT = int(os.getenv('DISCOVERY_PORT', 54321))
 
@@ -24,6 +24,7 @@ client = mqtt_client.Client(BASE_TOPIC)
 class NetworkDiscovery:
     def __init__(self):
         self.ping = b'afping'
+        self.pong = ""
 
     def nwk_discover_send(self):
         """Send discovery UDP packet to broadcast address"""
@@ -48,7 +49,6 @@ class NetworkDiscovery:
         """Listen for discovery response from Audioflow device"""
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.pong = ""
 
         try:
             self.sock.bind(('0.0.0.0', DISCOVERY_PORT))
@@ -59,116 +59,136 @@ class NetworkDiscovery:
             sys.exit()
 
         try:
-            data = self.sock.recvfrom(1024)
-            self.pong, self.info = data
-            self.pong = self.pong.decode('utf-8')
-        except AttributeError as e:
-            logging.debug(f"I don't know why this happens sometimes, but I don't want it crashing the program: {e}")
+            while True:
+                self.pong, self.info = self.sock.recvfrom(1024)
+                self.pong = self.pong.decode('utf-8')
+        except Exception as e:
+            print(f'Unable to receive: {e}')
         sleep(5)
         self.sock.close()
 
 class AudioflowDevice:
     def __init__(self):
-        self.zone_count = 0
-        self.switch_names = []
-        self.retry_count = 0
         self.timeout = 3
         self.states = ['off', 'on']
+        self.devices = {}
+        self.serial_nos = []
 
     def get_device_info(self, device_url):
-        """Get info about Audioflow device"""
+        """Get info about Audioflow device(s)"""
         try:
-            self.device_info = requests.get(url=device_url + 'switch', timeout=self.timeout)
-            self.device_info = json.loads(self.device_info.text)
-            self.zone_info = requests.get(url=device_url + 'zones', timeout=self.timeout)
-            self.zone_info = json.loads(self.zone_info.text)
-            self.serial_no = self.device_info['serial']
-            self.model = self.device_info['model']
-            self.zone_count = int(self.model[-2:-1]) # Second to last character in device model name shows zone count
-            self.name = self.device_info['name']
-            self.fw_version = self.device_info['version']
-            if nwk_discovery:
-                logging.info(f"Audioflow model {self.model} with name {self.name} and serial number {self.serial_no} discovered at {n.info[0]}")
-            else:
-                logging.info(f"Audioflow model {self.model} with name {self.name} and serial number {self.serial_no} found at {DEVICE_IP}")
-            client.publish(f'{BASE_TOPIC}/{self.serial_no}/status', 'online', MQTT_QOS, True)
+            device_info = requests.get(url=device_url + 'switch', timeout=self.timeout)
+            device_info = json.loads(device_info.text)
+            serial_no = device_info['serial']
+            model = device_info['model']
+            name = device_info['name']
+            self.devices[serial_no] = {}
+            self.devices[serial_no]['device_url'] = device_url
+            self.devices[serial_no]['zones'] = {}
+            self.devices[serial_no]['switch_names'] = []
+            self.devices[serial_no]['retry_count'] = 0
+            self.serial_nos.append(serial_no)
+
+            for item in device_info:
+                self.devices[serial_no][item] = device_info[item]
+
+            zone_info = requests.get(url=device_url + 'zones', timeout=self.timeout)
+            zone_info = json.loads(zone_info.text)
+            self.devices[serial_no]['zone_info'] = zone_info
+            zone_count = len(zone_info['zones'])
+            self.devices[serial_no]['zone_count'] = zone_count
+
+            message = f'discovered at {n.info[0]}' if nwk_discovery else f'found at {ip}'
+            logging.info(f"Audioflow model {model} with name {name} and serial number {serial_no} {message}")
+            client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'online', MQTT_QOS, True)
         except:
-            logging.error('No Audioflow device found.')
+            logging.error('No Audioflow devices found.')
             sys.exit()
         
-        for x in range(1,self.zone_count+1):
-            self.zone_name = self.zone_info['zones'][int(x)-1]['name']
-            if self.zone_name == "":
-                self.switch_names.append(f'Zone {x}')
+        for x in range(1,zone_count+1):
+            zone_name = zone_info['zones'][int(x)-1]['name']
+            self.devices[serial_no]['zones'][x] = zone_name
+            if zone_name == "":
+                self.devices[serial_no]['switch_names'].append(f'Zone {x}')
             else:
-                self.switch_names.append(self.zone_info['zones'][int(x)-1]['name'])
+                self.devices[serial_no]['switch_names'].append(zone_name)
 
-    def get_one_zone(self, zone_no):
+    def get_one_zone(self, serial_no, zone_no):
         """Get info about one zone and publish to MQTT"""
+        device_url = self.devices[serial_no]['device_url']
         try:
-            self.zones = requests.get(url=device_url + 'zones', timeout=self.timeout)
-            self.zones = json.loads(self.zones.text)
+            zones = requests.get(url=device_url + 'zones', timeout=self.timeout)
+            self.devices[serial_no]['zones'] = json.loads(zones.text)
         except Exception as e:
             logging.error(f'Unable to communicate with Audioflow device: {e}')
         
         try:
-            client.publish(f'{BASE_TOPIC}/{self.serial_no}/zone_state/{zone_no}', str(self.zones['zones'][int(zone_no)-1]['state']), MQTT_QOS)
-            client.publish(f'{BASE_TOPIC}/{self.serial_no}/zone_enabled/{zone_no}', str(self.zones['zones'][int(zone_no)-1]['enabled']), MQTT_QOS)
+            zones = self.devices[serial_no]['zones']['zones']
+            client.publish(f'{BASE_TOPIC}/{serial_no}/zone_state/{zone_no}', str(zones[int(zone_no)-1]['state']), MQTT_QOS)
+            client.publish(f'{BASE_TOPIC}/{serial_no}/zone_enabled/{zone_no}', str(zones[int(zone_no)-1]['enabled']), MQTT_QOS)
         except Exception as e:
             logging.error(f'Unable to publish zone state: {e}')
 
-    def get_all_zones(self):
+    def get_all_zones(self, serial_no):
         """Get info about all zones"""
+        device_url = self.devices[serial_no]['device_url']
+        retry_count = self.devices[serial_no]['retry_count']
         try:
-            self.zones = requests.get(url=device_url + 'zones', timeout=self.timeout)
-            self.zones = json.loads(self.zones.text)
-            d.publish_all_zones()
-            if self.retry_count > 0:
+            zones = requests.get(url=device_url + 'zones', timeout=self.timeout)
+            self.devices[serial_no]['zones'] = json.loads(zones.text)
+            d.publish_all_zones(serial_no)
+            if retry_count > 0:
                 logging.info('Reconnected to Audioflow device.')
-            self.retry_count = 0
-            client.publish(f'{BASE_TOPIC}/{self.serial_no}/status', 'online', MQTT_QOS, True)
+            self.devices[serial_no]['retry_count'] = 0
+            client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'online', MQTT_QOS, True)
         except Exception as e:
-            if self.retry_count < 3:
+            if retry_count < 3:
                 logging.error(f'Unable to communicate with Audioflow device: {e}')
-            self.retry_count += 1
-            if self.retry_count > 2:
-                client.publish(f'{BASE_TOPIC}/{self.serial_no}/status', 'offline', MQTT_QOS, True)
-                if self.retry_count < 4:
+            self.devices[serial_no]['retry_count'] += 1
+            if retry_count > 2:
+                client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'offline', MQTT_QOS, True)
+                if retry_count < 4:
                     logging.warning('Audioflow device unreachable; marking as offline.')
                     logging.warning('Trying to reconnect every 10 sec in the background...')
 
-    def publish_all_zones(self):
+    def publish_all_zones(self, serial_no):
         """Publish info about all zones to MQTT"""
+        zone_count = self.devices[serial_no]['zone_count']
+        zones = self.devices[serial_no]['zones']['zones']
         try:
-            for x in range(1,self.zone_count+1):
-                client.publish(f'{BASE_TOPIC}/{self.serial_no}/zone_state/{x}', str(self.zones['zones'][int(x)-1]['state']), MQTT_QOS)
-                client.publish(f'{BASE_TOPIC}/{self.serial_no}/zone_enabled/{x}', str(self.zones['zones'][int(x)-1]['enabled']), MQTT_QOS)
+            for x in range(1,zone_count+1):
+                client.publish(f'{BASE_TOPIC}/{serial_no}/zone_state/{x}', str(zones[int(x)-1]['state']), MQTT_QOS)
+                client.publish(f'{BASE_TOPIC}/{serial_no}/zone_enabled/{x}', str(zones[int(x)-1]['enabled']), MQTT_QOS)
         except Exception as e:
             logging.error(f'Unable to publish all zone states: {e}')
 
-    def set_zone_state(self, zone_no, zone_state):
+    def set_zone_state(self, serial_no, zone_no, zone_state):
         """Change state of one zone"""
-        if int(zone_no) > self.zone_count:
+        zone_count = self.devices[serial_no]['zone_count'] 
+        zones = self.devices[serial_no]['zones']['zones']
+        device_url = self.devices[serial_no]['device_url']
+        if int(zone_no) > zone_count:
             logging.warning(f'{zone_no} is an invalid zone number.')
-        elif self.zones['zones'][int(zone_no)-1]['enabled'] == 0:
+        elif zones[int(zone_no)-1]['enabled'] == 0:
             logging.warning(f'Zone {zone_no} is disabled.')
         else:
             if zone_state in ['on', 'off', 'toggle']:
                 try:
-                    current_state = self.zones['zones'][int(zone_no)-1]['state']
+                    current_state = zones[int(zone_no)-1]['state']
                     if zone_state in self.states:
                         data = self.states.index(zone_state)
                     else:
                         data = 1 if current_state == 'off' else 0
                     requests.put(url=device_url + 'zones/' + str(zone_no), data=str(data), timeout=self.timeout)
-                    d.get_one_zone(zone_no) # Device does not send new state after state change, so we get the new state and publish it to MQTT
+                    d.get_one_zone(serial_no, zone_no) # Device does not send new state after state change, so we get the new state and publish it to MQTT
                 except Exception as e:
                     logging.error(f'Set zone state failed: {e}')
             else:
                 logging.warning(f'"{zone_state}" is not a valid command. Valid commands are on, off, toggle')
 
-    def set_all_zone_states(self, zone_state):
+    def set_all_zone_states(self, serial_no, zone_state):
         """Turn all zones on or off"""
+        device_url = self.devices[serial_no]['device_url']
         if zone_state in self.states:
             try:
                 data = '1 1 1 1' if zone_state == 'on' else '0 0 0 0'
@@ -181,13 +201,15 @@ class AudioflowDevice:
         else:
             logging.warning(f'"{zone_state}" is not a valid command. Valid commands are on, off')
 
-    def set_zone_enable(self, zone_no, zone_enable):
+    def set_zone_enable(self, serial_no, zone_no, zone_enable):
         """Enable or disable zone"""
+        device_url = self.devices[serial_no]['device_url']
+        switch_names = self.devices[serial_no]['switch_names']
         if int(zone_enable) in [0, 1]:
             try:
                 # Audioflow device expects the zone name in the same payload when enabling/disabling zone, so we append the existing name here
-                requests.put(url=device_url + 'zonename/' + str(zone_no), data=str(str(zone_enable) + str(self.switch_names[int(zone_no)-1]).strip()), timeout=self.timeout)
-                d.get_one_zone(zone_no)
+                requests.put(url=device_url + 'zonename/' + str(zone_no), data=str(str(zone_enable) + str(switch_names[int(zone_no)-1]).strip()), timeout=self.timeout)
+                d.get_one_zone(serial_no, zone_no)
             except Exception as e:
                 logging.error(f'Enable/disable zone failed: {e}')
 
@@ -195,32 +217,39 @@ class AudioflowDevice:
         """Poll for Audioflow device information every 10 seconds in case button(s) is/are pressed on device"""
         while True:
             sleep(10)
-            d.get_all_zones()
+            for serial_no in self.serial_nos:
+                d.get_all_zones(serial_no)
 
-    def mqtt_discovery(self):
+    def mqtt_discovery(self, serial_no):
         """Send Home Assistant MQTT discovery payloads"""
         if HOME_ASSISTANT:
+            zone_count = self.devices[serial_no]['zone_count']
+            zone_info = self.devices[serial_no]['zone_info']['zones']
+            name = self.devices[serial_no]['name']
+            model = self.devices[serial_no]['model']
+            fw_version = self.devices[serial_no]['version']
+            switch_names = self.devices[serial_no]['switch_names']
             ha_switch = 'homeassistant/switch/'
             try:
-                for x in range(1,self.zone_count+1):
-                    name_suffix = ' (Disabled)' if self.zone_info['zones'][int(x)-1]['enabled'] == 0 else '' # append "(Disabled)" to the end of the default entity name if zone is disabled
-                    client.publish(f'{ha_switch}{self.serial_no}/{x}/config',json.dumps({
+                for x in range(1,zone_count+1):
+                    name_suffix = ' (Disabled)' if zone_info[int(x)-1]['enabled'] == 0 else '' # append "(Disabled)" to the end of the default entity name if zone is disabled
+                    client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({
                         'availability': [
                             {'topic': f'{BASE_TOPIC}/status'},
-                            {'topic': f'{BASE_TOPIC}/{self.serial_no}/status'}
+                            {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
-                        'name': f'{self.switch_names[x-1]} speakers{name_suffix}', 
-                        'command_topic': f'{BASE_TOPIC}/{self.serial_no}/set_zone_state/{x}', 
-                        'state_topic': f'{BASE_TOPIC}/{self.serial_no}/zone_state/{x}', 
+                        'name': f'{switch_names[x-1]} speakers{name_suffix}', 
+                        'command_topic': f'{BASE_TOPIC}/{serial_no}/set_zone_state/{x}', 
+                        'state_topic': f'{BASE_TOPIC}/{serial_no}/zone_state/{x}', 
                         'payload_on': 'on', 
                         'payload_off': 'off', 
-                        'unique_id': f'{self.serial_no}{x}', 
+                        'unique_id': f'{serial_no}{x}', 
                         'device': {
-                            'name': f'{self.name}', 
-                            'identifiers': f'{self.serial_no}', 
+                            'name': f'{name}', 
+                            'identifiers': f'{serial_no}', 
                             'manufacturer': 'Audioflow', 
-                            'model': f'{self.model}', 
-                            'sw_version': f'{self.fw_version}'}, 
+                            'model': f'{model}', 
+                            'sw_version': f'{fw_version}'}, 
                             'platform': 'mqtt', 
                             'icon': 'mdi:speaker'
                             }), 1, True)
@@ -245,61 +274,67 @@ def on_connect(client, userdata, flags, rc):
     logging.info('Connected to MQTT broker with result code ' + str(rc))
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    client.subscribe(f'{BASE_TOPIC}/{d.serial_no}/#')
-    d.mqtt_discovery()
+    for serial_no in d.serial_nos:
+        client.subscribe(f'{BASE_TOPIC}/{serial_no}/#')
+        d.mqtt_discovery(serial_no)
 
 def on_message(client, userdata, msg):
     """Listen for MQTT payloads and forward to Audioflow device"""
     payload = msg.payload.decode('utf-8')
     topic = str(msg.topic)
+    serial_no = topic[topic.find(BASE_TOPIC)+len(BASE_TOPIC)+1:topic.find('/set')]
     switch_no = topic[-1:]
     if 'set_zone_state' in topic:
         if topic.endswith('e'): # if no zone number is present in topic
-            d.set_all_zone_states(payload)
+            d.set_all_zone_states(serial_no, payload)
         else:
-            d.set_zone_state(switch_no, payload)
+            d.set_zone_state(serial_no, switch_no, payload)
     elif 'set_zone_enable' in topic:
-        d.set_zone_enable(switch_no, payload)
-
-if MQTT_HOST == None:
-    logging.error('Please specify the IP address or hostname of your MQTT broker.')
-    sys.exit()
-
-if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
-    logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
-    logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default')
-else:
-    logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
-
-d = AudioflowDevice()
-n = NetworkDiscovery()
-
-if DEVICE_IP != None:
-    logging.info('Device IP set; network discovery is disabled.')
-    nwk_discovery = False
-    device_ip = DEVICE_IP
-    device_url = f'http://{DEVICE_IP}/'
-    d.get_device_info(device_url)
-else:
-    nwk_discovery = True
-    logging.info('No device IP set; network discovery is enabled.')
-    nwk_discover_rx = t(target=n.nwk_discover_receive, daemon=True)
-    nwk_discover_rx.start()
-    n.nwk_discover_send()
-    sleep(2)
-    if 'afpong' in n.pong:
-        device_url = f'http://{n.info[0]}/'
-        d.get_device_info(device_url)
-        device_ip = n.info[0]
-        logging.info('Network discovery stopped')
-    else:
-        logging.error('No Audioflow device found.')
-        logging.error('Confirm that you have host networking enabled and that the Audioflow device is on the same subnet.')
-        sys.exit()
+        d.set_zone_enable(serial_no, switch_no, payload)
 
 if __name__ == '__main__':
+    if MQTT_HOST == None:
+        logging.error('Please specify the IP address or hostname of your MQTT broker.')
+        sys.exit()
+
+    if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
+        logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
+        logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default')
+    else:
+        logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
+
+    d = AudioflowDevice()
+    n = NetworkDiscovery()
+
+    if DEVICE_IPS != None:
+        device_ips = DEVICE_IPS.split(',')
+        s = 's' if len(device_ips) > 1 else ''
+        logging.info(f'Device IP{s} set; network discovery is disabled.')
+        nwk_discovery = False
+        device_ips = DEVICE_IPS.split(',')
+    else:
+        nwk_discovery = True
+        device_ips = []
+        logging.info('No device IP set; network discovery is enabled.')
+        nwk_discover_rx = t(target=n.nwk_discover_receive, daemon=True)
+        nwk_discover_rx.start()
+        n.nwk_discover_send()
+        sleep(3)
+        if 'afpong' in n.pong:
+            device_ips.append(n.info[0])
+            logging.info('Network discovery stopped')
+        else:
+            logging.error('No Audioflow device found.')
+            logging.error('Confirm that you have host networking enabled and that the Audioflow device is on the same subnet.')
+            sys.exit()
+
+    for ip in device_ips:
+        device_url = f'http://{ip}/'
+        d.get_device_info(device_url)
+
     mqtt_connect()
-    d.get_all_zones()
+    for serial_no in d.serial_nos:
+        d.get_all_zones(serial_no)
     polling_thread = t(target=d.poll_device, daemon=True)
     polling_thread.start()
     client.loop_forever()
