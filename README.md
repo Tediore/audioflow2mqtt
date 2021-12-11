@@ -45,7 +45,7 @@ docker run --name audioflow2mqtt \
 -e MQTT_QOS=1 \
 -e BASE_TOPIC=audioflow2mqtt \
 -e HOME_ASSISTANT=True \
--e DEVICE_IP=10.0.1.100,10.0.1.101 \
+-e DEVICE_IPS=10.0.1.100,10.0.1.101 \
 -e LOG_LEVEL=debug \
 --network host \ # only required if DEVICE_IPS is not set
 tediore/audioflow2mqtt:latest
