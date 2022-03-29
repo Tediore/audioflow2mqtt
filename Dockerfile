@@ -1,7 +1,9 @@
-FROM python:3-alpine
+FROM python:3
+
+COPY qemu-arm-static /usr/bin/qemu-arm-static
 
 ADD audioflow2mqtt.py /
 
-RUN pip install paho.mqtt requests
+RUN python3 -m pip install paho.mqtt requests
 
 CMD [ "python", "./audioflow2mqtt.py" ]
