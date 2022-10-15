@@ -2,6 +2,8 @@
 
 audioflow2mqtt enables local control of your Audioflow speaker switch(es) via MQTT. It supports Home Assistant MQTT discovery for easy integration. It can also automatically discover the Audioflow devices on your network via UDP discovery, or you can specify the IP address of the Audioflow devices if you don't want to use UDP discovery.
 
+<br>
+
 # Configuration
 audioflow2mqtt can be configured using environment variables or by using a configuration file named **config.yaml**. Example config.yaml with all possible configuration options:
 ```yaml
@@ -53,6 +55,8 @@ services:
 ```
 2. `docker-compose up -d audioflow2mqtt`
 
+<br>
+
 **Docker via `docker run` with config.yaml**
 
 Example `docker run` command:
@@ -62,6 +66,8 @@ docker run --name audioflow2mqtt \
 --network host \ # only required if device_ips is not set in config.yaml
 tediore/audioflow2mqtt:latest
 ```
+
+<br>
 
 **Docker via `docker-compose` without config.yaml**
 
