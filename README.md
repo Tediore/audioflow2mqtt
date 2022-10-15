@@ -49,7 +49,7 @@ services:
     container_name: audioflow2mqtt
     image: tediore/audioflow2mqtt:stable
     volumes:
-    - /path/to/config.yaml:config.yaml
+    - /path/to/config.yaml:/config.yaml
     restart: unless-stopped
     network_mode: host # only required if device_ips is not set in config.yaml
 ```
@@ -62,7 +62,7 @@ services:
 Example `docker run` command:
 ```
 docker run --name audioflow2mqtt \
--v /path/to/config.yaml:config.yaml \
+-v /path/to/config.yaml:/config.yaml \
 --network host \ # only required if device_ips is not set in config.yaml
 tediore/audioflow2mqtt:stable
 ```
