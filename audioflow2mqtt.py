@@ -15,26 +15,26 @@ config_file = os.path.exists('config.yaml')
 if config_file:
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
-    MQTT_HOST = config['mqtt_host']
+    MQTT_HOST = config['mqtt_host'] if 'mqtt_host' in config else None
     MQTT_PORT = config['mqtt_port'] if 'mqtt_port' in config else 1883
-    MQTT_USER = config['mqtt_user']
-    MQTT_PASSWORD = config['mqtt_password']
+    MQTT_USER = config['mqtt_user'] if 'mqtt_user' in config else None
+    MQTT_PASSWORD = config['mqtt_password'] if 'mqtt_password' in config else None
     MQTT_QOS = config['mqtt_qos'] if 'mqtt_qos' in config else 1
     BASE_TOPIC = config['base_topic'] if 'base_topic' in config else 'audioflow2mqtt'
     HOME_ASSISTANT = config['home_assistant'] if 'home_assistant' in config else True
-    DEVICE_IPS = config['device_ips']
+    DEVICE_IPS = config['device_ips'] if 'device_ips' in config else None
     LOG_LEVEL = config['log_level'].upper() if 'log_level' in config else 'INFO'
     DISCOVERY_PORT = config['discovery_port'] if 'discovery_port' in config else 54321
 
 else:
-    MQTT_HOST = os.getenv('MQTT_HOST')
+    MQTT_HOST = os.getenv('MQTT_HOST', None)
     MQTT_PORT = int(os.getenv('MQTT_PORT', 1883))
-    MQTT_USER = os.getenv('MQTT_USER')
-    MQTT_PASSWORD = os.getenv('MQTT_PASSWORD')
+    MQTT_USER = os.getenv('MQTT_USER', None)
+    MQTT_PASSWORD = os.getenv('MQTT_PASSWORD', None)
     MQTT_QOS = int(os.getenv('MQTT_QOS', 1))
     BASE_TOPIC = os.getenv('BASE_TOPIC', 'audioflow2mqtt')
     HOME_ASSISTANT = os.getenv('HOME_ASSISTANT', True)
-    DEVICE_IPS = os.getenv('DEVICE_IPS').split(',')
+    DEVICE_IPS = os.getenv('DEVICE_IPS')
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
     DISCOVERY_PORT = int(os.getenv('DISCOVERY_PORT', 54321))
 
@@ -364,7 +364,7 @@ def on_message(client, userdata, msg):
 if __name__ == '__main__':
     if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
         logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
-        logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default')
+        logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default (info)')
     else:
         logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
 
@@ -375,18 +375,23 @@ if __name__ == '__main__':
 
     if MQTT_HOST == None:
         logging.error('Please specify the IP address or hostname of your MQTT broker.')
+        logging.error('Exiting...')
         sys.exit()
+
+    if DEVICE_IPS != None:
+        nwk_discovery = False
+        device_ips = DEVICE_IPS
+        if not config_file:
+            device_ips = DEVICE_IPS.split(',')
+        s = 's' if len(device_ips) > 1 else ''
+        logging.info(f'Device IP{s} set; network discovery is disabled.')
+    else:
+        nwk_discovery = True
 
     d = AudioflowDevice()
     n = NetworkDiscovery()
 
-    if DEVICE_IPS != None:
-        device_ips = DEVICE_IPS
-        s = 's' if len(device_ips) > 1 else ''
-        logging.info(f'Device IP{s} set; network discovery is disabled.')
-        nwk_discovery = False
-    else:
-        nwk_discovery = True
+    if nwk_discovery:
         device_ips = []
         logging.info('No device IP set; network discovery is enabled.')
         nwk_discover_rx = t(target=n.nwk_discover_receive, daemon=True)
