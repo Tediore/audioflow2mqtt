@@ -47,7 +47,7 @@ version: '3'
 services:
   audioflow2mqtt:
     container_name: audioflow2mqtt
-    image: tediore/audioflow2mqtt:latest
+    image: tediore/audioflow2mqtt:stable
     volumes:
     - /path/to/config.yaml:config.yaml
     restart: unless-stopped
@@ -64,7 +64,7 @@ Example `docker run` command:
 docker run --name audioflow2mqtt \
 -v /path/to/config.yaml:config.yaml \
 --network host \ # only required if device_ips is not set in config.yaml
-tediore/audioflow2mqtt:latest
+tediore/audioflow2mqtt:stable
 ```
 
 <br>
@@ -77,7 +77,7 @@ version: '3'
 services:
   audioflow2mqtt:
     container_name: audioflow2mqtt
-    image: tediore/audioflow2mqtt:latest
+    image: tediore/audioflow2mqtt:stable
     environment:
     - MQTT_HOST=10.0.0.2
     - MQTT_PORT=1883
@@ -111,7 +111,7 @@ docker run --name audioflow2mqtt \
 -e DEVICE_IPS=10.0.1.100,10.0.1.101 \
 -e LOG_LEVEL=debug \
 --network host \ # only required if DEVICE_IPS is not set
-tediore/audioflow2mqtt:latest
+tediore/audioflow2mqtt:stable
 ```
 
 <br>
