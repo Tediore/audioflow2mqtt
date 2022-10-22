@@ -1,4 +1,3 @@
-from distutils.command.config import config
 import os
 import sys
 import json
@@ -11,6 +10,7 @@ from threading import Thread as t
 import paho.mqtt.client as mqtt_client
 
 config_file = os.path.exists('config.yaml')
+version = '0.5.0-dev'
 
 if config_file:
     with open('config.yaml', 'r') as file:
@@ -90,6 +90,7 @@ class AudioflowDevice:
     def __init__(self):
         self.timeout = 3
         self.states = ['off', 'on']
+        self.set_all_zones = {'off': '0 0 0 0', 'on': '1 1 1 1'}
         self.devices = {}
         self.serial_nos = []
 
@@ -133,8 +134,10 @@ class AudioflowDevice:
                 self.devices[serial_no]['switch_names'].append(zone_name)
 
     def get_network_info(self, serial_no):
-        """Get SSID and device signal strength"""
-        """String parsing :("""
+        """
+        Get SSID and device signal strength
+        String parsing :(
+        """
         device_url = self.devices[serial_no]['device_url']
         try:
             device_info = requests.get(url=device_url + 'switch', timeout=self.timeout)
@@ -231,9 +234,9 @@ class AudioflowDevice:
         device_url = self.devices[serial_no]['device_url']
         if zone_state in self.states:
             try:
-                data = '1 1 1 1' if zone_state == 'on' else '0 0 0 0'
+                data = self.set_all_zones[zone_state]
                 requests.put(url=device_url + 'zones', data=str(data), timeout=self.timeout)
-                d.get_all_zones() # Device does not send new state after state change, so we get the new state and publish it to MQTT
+                d.get_all_zones(serial_no) # Device does not send new state after state change, so we get the new state and publish it to MQTT
             except Exception as e:
                 logging.error(f'Set all zone states failed: {e}')
         elif zone_state == 'toggle':
@@ -271,23 +274,49 @@ class AudioflowDevice:
             fw_version = self.devices[serial_no]['version']
             switch_names = self.devices[serial_no]['switch_names']
             ha_switch = 'homeassistant/switch/'
+            ha_button = 'homeassistant/button/'
             ha_sensor = 'homeassistant/sensor/'
             try:
                 # HA switch entities
                 for x in range(1,zone_count+1):
                     name_suffix = ' (Disabled)' if zone_info[int(x)-1]['enabled'] == 0 else '' # append "(Disabled)" to the end of the default entity name if zone is disabled
+                    name = f'{switch_names[x-1]} speakers{name_suffix}'
                     client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({
                         'availability': [
                             {'topic': f'{BASE_TOPIC}/status'},
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
-                        'name': f'{switch_names[x-1]} speakers{name_suffix}', 
+                        'name': name, 
+                        'object_id': f'{name} {serial_no}',
                         'command_topic': f'{BASE_TOPIC}/{serial_no}/set_zone_state/{x}', 
                         'state_topic': f'{BASE_TOPIC}/{serial_no}/zone_state/{x}', 
                         'payload_on': 'on', 
                         'payload_off': 'off', 
                         'unique_id': f'{serial_no}{x}', 
                         'icon': 'mdi:speaker',
+                        'device': {
+                            'name': f'{name}', 
+                            'identifiers': f'{serial_no}', 
+                            'manufacturer': 'Audioflow', 
+                            'model': f'{model}', 
+                            'sw_version': f'{fw_version}'}, 
+                            'platform': 'mqtt'
+                            }), 1, True)
+
+                # HA button entities
+                for x in ['off', 'on']:
+                    name = f'Turn all zones {x}'
+                    client.publish(f'{ha_button}{serial_no}/all_zones_{x}/config',json.dumps({
+                        'availability': [
+                            {'topic': f'{BASE_TOPIC}/status'},
+                            {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
+                            ], 
+                        'name': name,
+                        'object_id': f'{name} {serial_no}',
+                        'command_topic': f'{BASE_TOPIC}/{serial_no}/set_zone_state', 
+                        'payload_press': x, 
+                        'unique_id': f'{serial_no}_all_zones_{x}', 
+                        'icon': f'mdi:power-{x}',
                         'device': {
                             'name': f'{name}', 
                             'identifiers': f'{serial_no}', 
@@ -304,12 +333,14 @@ class AudioflowDevice:
                                         'rssi': {'name': 'RSSI', 'icon': 'mdi:signal'}
                                         }
                 for x in network_info_names.keys():
+                    name = f"{name} {network_info_names[x]['name']}"
                     client.publish(f'{ha_sensor}{serial_no}/{x}/config',json.dumps({
                         'availability': [
                             {'topic': f'{BASE_TOPIC}/status'},
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
-                        'name': f"{name} {network_info_names[x]['name']}",
+                        'name': name,
+                        'object_id': f'{name} {serial_no}',
                         'state_topic': f'{BASE_TOPIC}/{serial_no}/network_info/{x}',
                         'icon': f"{network_info_names[x]['icon']}",
                         'unique_id': f'{serial_no}{x}',
@@ -362,8 +393,10 @@ def on_message(client, userdata, msg):
         d.set_zone_enable(serial_no, switch_no, payload)
 
 if __name__ == '__main__':
+    logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
+    logging.info(f'=== audioflow2mqtt version {version} started ===')
+
     if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
-        logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
         logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default (info)')
     else:
         logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
