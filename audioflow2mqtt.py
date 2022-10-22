@@ -280,14 +280,14 @@ class AudioflowDevice:
                 # HA switch entities
                 for x in range(1,zone_count+1):
                     name_suffix = ' (Disabled)' if zone_info[int(x)-1]['enabled'] == 0 else '' # append "(Disabled)" to the end of the default entity name if zone is disabled
-                    name = f'{switch_names[x-1]} speakers{name_suffix}'
+                    entity_name = f'{switch_names[x-1]} speakers{name_suffix}'
                     client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({
                         'availability': [
                             {'topic': f'{BASE_TOPIC}/status'},
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
-                        'name': name, 
-                        'object_id': f'{name} {serial_no}',
+                        'name': entity_name, 
+                        'object_id': f'{entity_name} {serial_no}',
                         'command_topic': f'{BASE_TOPIC}/{serial_no}/set_zone_state/{x}', 
                         'state_topic': f'{BASE_TOPIC}/{serial_no}/zone_state/{x}', 
                         'payload_on': 'on', 
@@ -305,14 +305,14 @@ class AudioflowDevice:
 
                 # HA button entities
                 for x in ['off', 'on']:
-                    name = f'Turn all zones {x}'
+                    entity_name = f'Turn all zones {x}'
                     client.publish(f'{ha_button}{serial_no}/all_zones_{x}/config',json.dumps({
                         'availability': [
                             {'topic': f'{BASE_TOPIC}/status'},
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
-                        'name': name,
-                        'object_id': f'{name} {serial_no}',
+                        'name': entity_name,
+                        'object_id': f'{entity_name} {serial_no}',
                         'command_topic': f'{BASE_TOPIC}/{serial_no}/set_zone_state', 
                         'payload_press': x, 
                         'unique_id': f'{serial_no}_all_zones_{x}', 
@@ -333,14 +333,14 @@ class AudioflowDevice:
                                         'rssi': {'name': 'RSSI', 'icon': 'mdi:signal'}
                                         }
                 for x in network_info_names.keys():
-                    name = f"{name} {network_info_names[x]['name']}"
+                    entity_name = f"{network_info_names[x]['name']}"
                     client.publish(f'{ha_sensor}{serial_no}/{x}/config',json.dumps({
                         'availability': [
                             {'topic': f'{BASE_TOPIC}/status'},
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
-                        'name': name,
-                        'object_id': f'{name} {serial_no}',
+                        'name': entity_name,
+                        'object_id': f'{entity_name} {serial_no}',
                         'state_topic': f'{BASE_TOPIC}/{serial_no}/network_info/{x}',
                         'icon': f"{network_info_names[x]['icon']}",
                         'unique_id': f'{serial_no}{x}',
