@@ -125,7 +125,10 @@ tediore/audioflow2mqtt:stable
 <br>
 
 # Home Assistant
-audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for the Audioflow switch and entities for each zone as well as sensors for SSID, RSSI (signal strength), and Wi-Fi channel.
+audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for the Audioflow switch with the following:
+- Switch entities for each zone
+- Button entities to turn all zones on/off
+- Sensors for SSID, RSSI (signal strength), and Wi-Fi channel
 
 ![Home Assistant Device screenshot](ha_screenshot.png)
 
