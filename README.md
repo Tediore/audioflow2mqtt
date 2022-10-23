@@ -16,6 +16,7 @@ base_topic: audioflow2mqtt
 home_assistant: True
 device_ips:
 - 10.0.1.100
+- 10.0.1.101
 discovery_port: 54321
 log_level: debug
 ```
