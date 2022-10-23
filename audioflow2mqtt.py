@@ -10,7 +10,7 @@ from threading import Thread as t
 import paho.mqtt.client as mqtt_client
 
 config_file = os.path.exists('config.yaml')
-version = '0.5.1-dev'
+version = '0.6.0-dev'
 
 if config_file:
     with open('config.yaml', 'r') as file:
@@ -44,6 +44,7 @@ class NetworkDiscovery:
     def __init__(self):
         self.ping = b'afping'
         self.pong = ""
+        self.discovered_devices = []
 
     def nwk_discover_send(self):
         """Send discovery UDP packet to broadcast address"""
@@ -55,14 +56,15 @@ class NetworkDiscovery:
             self.sock.bind(('0.0.0.0', DISCOVERY_PORT))
         except Exception as e:
             logging.error(f'Unable to bind port {DISCOVERY_PORT}: {e}')
-            sys.exit()
+            sys.exit(1)
         
-        try:
-            self.sock.sendto(self.ping,('<broadcast>', 10499))
-            logging.debug('Sending UDP broadcast')
-        except Exception as e:
-            logging.error(f'Unable to send broadcast packet: {e}')
-            sys.exit()
+        for x in range(3): # Send discovery packet three times
+            logging.info(f'Sending discovery broadcast {x+1} of 3...')
+            try:
+                self.sock.sendto(self.ping,('<broadcast>', 10499))
+            except Exception as e:
+                logging.error(f'Unable to send broadcast packet: {e}')
+            sleep(3)
 
     def nwk_discover_receive(self):
         """Listen for discovery response from Audioflow device"""
@@ -75,16 +77,19 @@ class NetworkDiscovery:
         except Exception as e:
             logging.error(f'Unable to bind port {DISCOVERY_PORT}: {e}')
             logging.error(f'Make sure nothing is currently using port {DISCOVERY_PORT}')
-            sys.exit()
 
         try:
             while True:
                 self.pong, self.info = self.sock.recvfrom(1024)
                 self.pong = self.pong.decode('utf-8')
+                if self.info[0] not in self.discovered_devices:
+                    self.discovered_devices.append(self.info[0])
+                    logging.info(f'Discovery response received from {self.info[0]}; added to list of discovered devices')
+                else:
+                    logging.debug(f'Discovery response received from {self.info[0]}; already in list of discovered devices')
+
         except Exception as e:
             print(f'Unable to receive: {e}')
-        sleep(5)
-        self.sock.close()
 
 class AudioflowDevice:
     def __init__(self):
@@ -94,10 +99,18 @@ class AudioflowDevice:
         self.devices = {}
         self.serial_nos = []
 
-    def get_device_info(self, device_url):
+    def get_device_info(self, device_url, ip):
         """Get info about Audioflow device(s)"""
+        device = True
         try:
+            logging.debug(f'Attempting to connect to {ip}')
             device_info = requests.get(url=device_url + 'switch', timeout=self.timeout)
+            logging.debug(f'Connected to {ip}.')
+        except Exception as e:
+            logging.error(f'Unable to connect to {ip}')
+            device = False
+
+        if device:
             device_info = json.loads(device_info.text)
             serial_no = device_info['serial']
             model = device_info['model']
@@ -118,20 +131,18 @@ class AudioflowDevice:
             zone_count = len(zone_info['zones'])
             self.devices[serial_no]['zone_count'] = zone_count
 
+
             message = f'discovered at {n.info[0]}' if nwk_discovery else f'found at {ip}'
             logging.info(f"Audioflow model {model} with name {name} and serial number {serial_no} {message}")
             client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'online', MQTT_QOS, True)
-        except:
-            logging.error('No Audioflow devices found.')
-            sys.exit()
         
-        for x in range(1,zone_count+1):
-            zone_name = zone_info['zones'][int(x)-1]['name']
-            self.devices[serial_no]['zones'][x] = zone_name
-            if zone_name == "":
-                self.devices[serial_no]['switch_names'].append(f'Zone {x}')
-            else:
-                self.devices[serial_no]['switch_names'].append(zone_name)
+            for x in range(1,zone_count+1):
+                zone_name = zone_info['zones'][int(x)-1]['name']
+                self.devices[serial_no]['zones'][x] = zone_name
+                if zone_name == "":
+                    self.devices[serial_no]['switch_names'].append(f'Zone {x}')
+                else:
+                    self.devices[serial_no]['switch_names'].append(zone_name)
 
     def get_network_info(self, serial_no):
         """
@@ -367,7 +378,7 @@ def mqtt_connect():
         client.publish(f'{BASE_TOPIC}/status', 'online', 1, True)
     except Exception as e:
         logging.error(f'Unable to connect to MQTT broker: {e}')
-        sys.exit()
+        sys.exit(1)
 
 def on_connect(client, userdata, flags, rc):
     # The callback for when the client receives a CONNACK response from the MQTT broker.
@@ -395,6 +406,8 @@ def on_message(client, userdata, msg):
 if __name__ == '__main__':
     logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
     logging.info(f'=== audioflow2mqtt version {version} started ===')
+    if 'dev' in version:
+        logging.info('=== Very bold of you to run a development version ;) ===')
 
     if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
         logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default (info)')
@@ -409,7 +422,7 @@ if __name__ == '__main__':
     if MQTT_HOST == None:
         logging.error('Please specify the IP address or hostname of your MQTT broker.')
         logging.error('Exiting...')
-        sys.exit()
+        sys.exit(1)
 
     if DEVICE_IPS != None:
         nwk_discovery = False
@@ -430,18 +443,19 @@ if __name__ == '__main__':
         nwk_discover_rx = t(target=n.nwk_discover_receive, daemon=True)
         nwk_discover_rx.start()
         n.nwk_discover_send()
-        sleep(3)
-        if 'afpong' in n.pong:
-            device_ips.append(n.info[0])
+        if n.discovered_devices:
+            device_ips = n.discovered_devices
             logging.info('Network discovery stopped')
+            n.sock.close()
         else:
-            logging.error('No Audioflow device found.')
-            logging.error('Confirm that you have host networking enabled and that the Audioflow device is on the same subnet.')
-            sys.exit()
+            logging.error('No Audioflow devices found.')
+            logging.error('Confirm that you have host networking enabled, that the Audioflow device is on the same subnet.')
+            n.sock.close()
+            sys.exit(1)
 
     for ip in device_ips:
         device_url = f'http://{ip}/'
-        d.get_device_info(device_url)
+        d.get_device_info(device_url, ip)
 
     mqtt_connect()
     for serial_no in d.serial_nos:
