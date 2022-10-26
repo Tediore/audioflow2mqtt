@@ -10,7 +10,7 @@ from threading import Thread as t
 import paho.mqtt.client as mqtt_client
 
 config_file = os.path.exists('config.yaml')
-version = '0.6.0-dev'
+version = '0.7.0-alpha'
 
 if config_file:
     with open('config.yaml', 'r') as file:
