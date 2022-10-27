@@ -32,7 +32,7 @@ log_level: debug
 | `MQTT_QOS` | 1 | False | The MQTT QoS level. |
 | `BASE_TOPIC` | audioflow2mqtt | True | The topic prefix to use for all payloads. |
 | `HOME_ASSISTANT` | True | False | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
-| `DEVICE_IPS` | None | Depends* | IP address(es) of your Audioflow device(s). Must be a comma-separated string (if multiple). <br>\* Required if you don't plan to use UDP discovery. |
+| `DEVICE_IPS` | None | Depends* | IP address(es) of your Audioflow device(s). If using environment variables, must be a comma-separated string (if multiple); otherwise, it must be a list. <br>\* Required if you don't plan to use UDP discovery. |
 | `DISCOVERY_PORT` | 54321 | False | The port to open on the host to send/receive UDP discovery packets. |
 | `LOG_LEVEL` | info | False | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error` |
 
@@ -126,7 +126,10 @@ tediore/audioflow2mqtt:stable
 <br>
 
 # Home Assistant
-audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for the Audioflow switch and entities for each zone as well as sensors for SSID, RSSI (signal strength), and Wi-Fi channel.
+audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for the Audioflow switch with the following:
+- Switch entities for each zone
+- Button entities to turn all zones on/off
+- Sensors for SSID, RSSI (signal strength), and Wi-Fi channel
 
 ![Home Assistant Device screenshot](ha_screenshot.png)
 
