@@ -133,7 +133,8 @@ class AudioflowDevice:
             self.devices[serial_no]['zone_count'] = zone_count
 
 
-            message = f'discovered at {n.info[0]}' if nwk_discovery else f'found at {ip}'
+            message = 'discovered at ' if nwk_discovery else 'found at '
+            message += f'{ip}'
             logging.info(f"Audioflow model {model} with name {name} and serial number {serial_no} {message}")
             client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'online', MQTT_QOS, True)
         
@@ -418,8 +419,6 @@ def on_message(client, userdata, msg):
 if __name__ == '__main__':
     logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
     logging.info(f'=== audioflow2mqtt version {version} started ===')
-    if 'dev' in version:
-        logging.info('=== Very bold of you to run a development version ;) ===')
 
     if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
         logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default (info)')
@@ -451,7 +450,7 @@ if __name__ == '__main__':
 
     if nwk_discovery:
         device_ips = []
-        logging.info('No device IP set; network discovery is enabled.')
+        logging.info('No device IPs set; network discovery is enabled.')
         nwk_discover_rx = t(target=n.nwk_discover_receive, daemon=True)
         nwk_discover_rx.start()
         n.nwk_discover_send()
@@ -461,7 +460,7 @@ if __name__ == '__main__':
             n.sock.close()
         else:
             logging.error('No Audioflow devices found.')
-            logging.error('Confirm that you have host networking enabled, that the Audioflow device is on the same subnet.')
+            logging.error('Confirm that you have host networking enabled and that the Audioflow device is on the same subnet.')
             n.sock.close()
             sys.exit(1)
 
