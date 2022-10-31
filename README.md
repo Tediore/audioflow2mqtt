@@ -55,7 +55,7 @@ services:
     volumes:
     - /path/to/config.yaml:/config.yaml
     restart: unless-stopped
-    network_mode: host # only required if devices is not set in config.yaml
+    network_mode: host # only required if devices option is not set in config.yaml
 ```
 2. `docker-compose up -d audioflow2mqtt`
 
@@ -67,7 +67,7 @@ Example `docker run` command:
 ```
 docker run --name audioflow2mqtt \
 -v /path/to/config.yaml:/config.yaml \
---network host \ # only required if devices is not set in config.yaml
+--network host \ # only required if devices option is not set in config.yaml
 tediore/audioflow2mqtt:stable
 ```
 
@@ -94,7 +94,7 @@ services:
     - DISCOVERY_PORT=54321
     - LOG_LEVEL=debug
     restart: unless-stopped
-    network_mode: host # only required if DEVICES is not set
+    network_mode: host # only required if DEVICES variable is not set
 ```
 2. `docker-compose up -d audioflow2mqtt`
 
@@ -114,7 +114,7 @@ docker run --name audioflow2mqtt \
 -e HOME_ASSISTANT=True \
 -e DEVICES=10.0.1.100,10.0.1.101 \
 -e LOG_LEVEL=debug \
---network host \ # only required if DEVICES is not set
+--network host \ # only required if DEVICES variable is not set
 tediore/audioflow2mqtt:stable
 ```
 
