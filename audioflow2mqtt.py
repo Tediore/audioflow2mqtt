@@ -11,21 +11,23 @@ import paho.mqtt.client as mqtt_client
 
 config_file = os.path.exists('config.yaml')
 
-version = '0.6.0'
+version = '0.7.0'
 
 if config_file:
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
-    MQTT_HOST = config['mqtt_host'] if 'mqtt_host' in config else None
-    MQTT_PORT = config['mqtt_port'] if 'mqtt_port' in config else 1883
-    MQTT_USER = config['mqtt_user'] if 'mqtt_user' in config else None
-    MQTT_PASSWORD = config['mqtt_password'] if 'mqtt_password' in config else None
-    MQTT_QOS = config['mqtt_qos'] if 'mqtt_qos' in config else 1
-    BASE_TOPIC = config['base_topic'] if 'base_topic' in config else 'audioflow2mqtt'
-    HOME_ASSISTANT = config['home_assistant'] if 'home_assistant' in config else True
-    DEVICE_IPS = config['device_ips'] if 'device_ips' in config else None
-    LOG_LEVEL = config['log_level'].upper() if 'log_level' in config else 'INFO'
-    DISCOVERY_PORT = config['discovery_port'] if 'discovery_port' in config else 54321
+        mqtt = config['mqtt']
+        gen = config['general']
+    MQTT_HOST = mqtt['host'] if 'host' in mqtt else None
+    MQTT_PORT = mqtt['port'] if 'port' in mqtt else 1883
+    MQTT_USER = mqtt['user'] if 'user' in mqtt else None
+    MQTT_PASSWORD = mqtt['password'] if 'password' in mqtt else None
+    MQTT_QOS = mqtt['qos'] if 'qos' in mqtt else 1
+    BASE_TOPIC = mqtt['base_topic'] if 'base_topic' in mqtt else 'audioflow2mqtt'
+    HOME_ASSISTANT = mqtt['home_assistant'] if 'home_assistant' in mqtt else True
+    DEVICE_IPS = gen['devices'] if 'devices' in gen else None
+    LOG_LEVEL = gen['log_level'].upper() if 'log_level' in gen else 'INFO'
+    DISCOVERY_PORT = gen['discovery_port'] if 'discovery_port' in gen else 54321
 
 else:
     MQTT_HOST = os.getenv('MQTT_HOST', None)
@@ -35,7 +37,7 @@ else:
     MQTT_QOS = int(os.getenv('MQTT_QOS', 1))
     BASE_TOPIC = os.getenv('BASE_TOPIC', 'audioflow2mqtt')
     HOME_ASSISTANT = os.getenv('HOME_ASSISTANT', True)
-    DEVICE_IPS = os.getenv('DEVICE_IPS')
+    DEVICE_IPS = os.getenv('DEVICE_IPS') if os.getenv('DEVICE_IPS') != None else os.getenv('DEVICES')
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
     DISCOVERY_PORT = int(os.getenv('DISCOVERY_PORT', 54321))
 
@@ -418,13 +420,12 @@ def on_message(client, userdata, msg):
         d.set_zone_enable(serial_no, switch_no, payload)
 
 if __name__ == '__main__':
-    logging.basicConfig(level='INFO', format='%(asctime)s %(levelname)s: %(message)s')
-    logging.info(f'=== audioflow2mqtt version {version} started ===')
-
     if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
         logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default (info)')
     else:
         logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
+
+    logging.info(f'=== audioflow2mqtt version {version} started ===')
 
     if config_file:
         logging.info('Configuration file found.')

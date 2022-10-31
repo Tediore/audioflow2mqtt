@@ -1,11 +1,15 @@
-mqtt_host: 10.0.0.2
-mqtt_port: 1883
-mqtt_user: user
-mqtt_password: password
-mqtt_qos: 1
-base_topic: audioflow2mqtt
-home_assistant: True
-device_ips:
-- 10.0.1.100
-discovery_port: 54321
-log_level: debug
+mqtt:
+  host: 10.0.0.2
+  port: 1883
+  user: user
+  password: password
+  qos: 1
+  base_topic: audioflow2mqtt
+  home_assistant: True
+
+general:
+  devices:
+  - 10.0.1.100
+  - 10.0.1.101
+  discovery_port: 54321
+  log_level: debug
