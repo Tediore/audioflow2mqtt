@@ -104,12 +104,12 @@ class AudioflowDevice:
         self.devices = {}
         self.serial_nos = []
 
-    def get_device_info(self, device_url, ip, nwk_discovery):
+    async def get_device_info(self, device_url, ip, nwk_discovery, request):
         """Get info about Audioflow device(s)"""
         device = True
         try:
             logging.debug(f'Attempting to connect to {ip}')
-            device_info = httpx.get(url=device_url + 'switch', timeout=self.timeout)
+            device_info = await request.get(url=device_url + 'switch', timeout=self.timeout)
             logging.debug(f'Connected to {ip}.')
         except Exception as e:
             logging.error(f'Unable to connect to {ip}')
@@ -153,7 +153,7 @@ class AudioflowDevice:
             
             logging.debug(self.devices[serial_no])
 
-    async def get_network_info(self, serial_no):
+    async def get_network_info(self, serial_no, request):
         """
         Get SSID and device signal strength
         String parsing :(
@@ -162,8 +162,7 @@ class AudioflowDevice:
         retry_count = self.devices[serial_no]['retry_count']
         if not retry_count:
             try:
-                async with httpx.AsyncClient() as request:
-                    device_info = await request.get(url=device_url + 'switch', timeout=self.timeout)    
+                device_info = await request.get(url=device_url + 'switch', timeout=self.timeout)    
             except Exception as e:
                 logging.error(f'Unable to get network info: {e}')
             device_info = json.loads(device_info.text)
@@ -196,14 +195,13 @@ class AudioflowDevice:
         except Exception as e:
             logging.error(f'Unable to publish zone state: {e}')
 
-    async def get_all_zones(self, serial_no):
+    async def get_all_zones(self, serial_no, request):
         """Get info about all zones"""
         device_url = self.devices[serial_no]['device_url']
         ip = self.devices[serial_no]['ip_addr']
         retry_count = self.devices[serial_no]['retry_count']
         try:
-            async with httpx.AsyncClient() as request:
-                zones = await request.get(url=device_url + 'zones', timeout=self.timeout)
+            zones = await request.get(url=device_url + 'zones', timeout=self.timeout)
             self.devices[serial_no]['zones'] = json.loads(zones.text)
             await d.publish_all_zones(serial_no)
             if retry_count > 0:
@@ -287,19 +285,17 @@ class AudioflowDevice:
             except Exception as e:
                 logging.error(f'Enable/disable zone for device at {ip} failed: {e}')
 
-    async def poll_device_state(self):
+    async def poll_device_state(self, serial_no, request):
         """Poll for Audioflow device information every 10 seconds in case button(s) is/are pressed on device"""
         while True:
-            for serial_no in self.serial_nos:
-                await d.get_all_zones(serial_no)
             await asyncio.sleep(10)
+            await d.get_all_zones(serial_no, request)
 
-    async def poll_network_info(self):
+    async def poll_network_info(self, serial_no, request):
         """Poll for Audioflow device network information every 60 seconds"""
         while True:
-            for serial_no in self.serial_nos:
-                await d.get_network_info(serial_no)
             await asyncio.sleep(60)
+            await d.get_network_info(serial_no, request)
 
     async def mqtt_discovery(self, serial_no, client):
         """Send Home Assistant MQTT discovery payloads"""
@@ -490,14 +486,18 @@ async def main():
             n.sock.close()
             sys.exit(1)
 
+    request = httpx.AsyncClient()
+
     for ip in device_ips:
         device_url = f'http://{ip}/'
-        d.get_device_info(device_url, ip, nwk_discovery)
+        await d.get_device_info(device_url, ip, nwk_discovery, request)
+    device_state_polling = [d.poll_device_state(serial_no, request) for serial_no in d.serial_nos]
+    network_info_polling = [d.poll_network_info(serial_no, request) for serial_no in d.serial_nos]
 
     await asyncio.gather(
         mqtt_handler(),
-        d.poll_device_state(),
-        d.poll_network_info()
+        *device_state_polling,
+        *network_info_polling
     )
 
 if __name__ == '__main__':
