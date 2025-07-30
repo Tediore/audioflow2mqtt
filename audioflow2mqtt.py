@@ -12,7 +12,7 @@ import yaml
 
 config_file = os.path.exists('config.yaml')
 
-version = '0.8.0b'
+version = '0.8.0'
 
 if config_file:
     with open('config.yaml', 'r') as file:
