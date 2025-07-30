@@ -93,6 +93,7 @@ services:
     - DEVICES=10.0.1.100,10.0.1.101
     - DISCOVERY_PORT=54321
     - LOG_LEVEL=debug
+    - TZ=America/Chicago # optional, but will ensure logging has local time instead of UTC (change to your timezone).
     restart: unless-stopped
     network_mode: host # only required if DEVICES variable is not set
 ```
