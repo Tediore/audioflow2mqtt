@@ -13,5 +13,6 @@
     - DEVICE_IPS=10.0.1.100,10.0.1.101
     - DISCOVERY_PORT=54321
     - LOG_LEVEL=debug
+    - TZ=America/Chicago
     restart: unless-stopped
     network_mode: host
