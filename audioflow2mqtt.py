@@ -105,6 +105,7 @@ class AudioflowDevice:
     async def get_device_info(self, device_url, ip, nwk_discovery, httpx_async):
         """Get info about Audioflow device(s)"""
         device = True
+        zone_list = ['A', 'B', 'C', 'D']
         try:
             logging.debug(f'Attempting to connect to {ip}...')
             device_info = await httpx_async.get(url=device_url + 'switch', timeout=self.timeout)
@@ -129,7 +130,7 @@ class AudioflowDevice:
             for item in device_info:
                 self.devices[serial_no][item] = device_info[item]
 
-            zone_info = httpx.get(url=device_url + 'zones', timeout=self.timeout)
+            zone_info = await httpx_async.get(url=device_url + 'zones', timeout=self.timeout)
             zone_info = json.loads(zone_info.text)
             self.devices[serial_no]['zone_info'] = zone_info
             zone_count = len(zone_info['zones'])
@@ -139,13 +140,12 @@ class AudioflowDevice:
             message += f'{ip}'
             logging.info(f"Audioflow model {model} with name {name} and serial number {serial_no} {message}")
         
-            for x in range(1,zone_count+1):
-                zone_name = zone_info['zones'][int(x)-1]['name']
+            for x in range(zone_count):
+                zone_name = zone_info['zones'][int(x)]['name']
                 self.devices[serial_no]['zones'][x] = zone_name
                 if zone_name == "":
-                    self.devices[serial_no]['switch_names'].append(f'Zone {x}')
-                else:
-                    self.devices[serial_no]['switch_names'].append(zone_name)
+                    zone_name = f'Zone {zone_list[x]}'
+                self.devices[serial_no]['switch_names'].append(zone_name)
             
             self.devices[serial_no]['zones'] = zone_info
             
@@ -266,7 +266,7 @@ class AudioflowDevice:
                 data = self.set_all_zones[zone_state]
                 async with httpx.AsyncClient() as httpx_async:
                     await httpx_async.put(url=device_url + 'zones', data=str(data), timeout=self.timeout)
-                await d.get_all_zones(serial_no) # Device does not send new state after state change, so we get the new state and publish it to MQTT
+                    await d.get_all_zones(serial_no, httpx_async) # Device does not send new state after state change, so we get the new state and publish it to MQTT
             except Exception as e:
                 logging.error(f'Set all zone states for device at {ip} failed: {e}')
         elif zone_state == 'toggle':
