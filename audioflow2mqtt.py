@@ -376,7 +376,7 @@ class AudioflowDevice:
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
                         'name': entity_name,
-                        'object_id': f'{entity_name} {serial_no}',
+                        'default_entity_id': f'sensor.{entity_name} {serial_no}',
                         'state_topic': f'{BASE_TOPIC}/{serial_no}/network_info/{x}',
                         'icon': f"{network_info_names[x]['icon']}",
                         'unique_id': f'{serial_no}{x}',
