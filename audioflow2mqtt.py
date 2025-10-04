@@ -323,7 +323,7 @@ class AudioflowDevice:
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
                         'name': entity_name, 
-                        'object_id': f'{entity_name} {serial_no}',
+                        'default_entity_id': f'switch.{entity_name} {serial_no}',
                         'command_topic': f'{BASE_TOPIC}/{serial_no}/set_zone_state/{x}', 
                         'state_topic': f'{BASE_TOPIC}/{serial_no}/zone_state/{x}', 
                         'payload_on': 'on', 
@@ -348,7 +348,7 @@ class AudioflowDevice:
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
                         'name': entity_name,
-                        'object_id': f'{entity_name} {serial_no}',
+                        default_entity_id': f'button.{entity_name} {serial_no},
                         'command_topic': f'{BASE_TOPIC}/{serial_no}/set_zone_state', 
                         'payload_press': x, 
                         'unique_id': f'{serial_no}_all_zones_{x}', 
@@ -376,7 +376,7 @@ class AudioflowDevice:
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
                         'name': entity_name,
-                        'object_id': f'{entity_name} {serial_no}',
+                        'default_entity_id': f'sensor.{entity_name} {serial_no}',
                         'state_topic': f'{BASE_TOPIC}/{serial_no}/network_info/{x}',
                         'icon': f"{network_info_names[x]['icon']}",
                         'unique_id': f'{serial_no}{x}',
