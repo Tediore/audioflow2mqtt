@@ -12,7 +12,7 @@ import yaml
 
 config_file = os.path.exists('config.yaml')
 
-version = '0.8.0'
+version = '0.8.1'
 
 if config_file:
     with open('config.yaml', 'r') as file:
@@ -317,13 +317,14 @@ class AudioflowDevice:
                 for x in range(1,zone_count+1):
                     name_suffix = ' (Disabled)' if zone_info[int(x)-1]['enabled'] == 0 else '' # append "(Disabled)" to the end of the default entity name if zone is disabled
                     entity_name = f'{switch_names[x-1]} speakers{name_suffix}'
+                    entity_id = f"switch.{entity_name.replace(' ','_').lower()}_{serial_no}"
                     await client.publish(f'{ha_switch}{serial_no}/{x}/config',json.dumps({
                         'availability': [
                             {'topic': f'{BASE_TOPIC}/status'},
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
                         'name': entity_name, 
-                        'object_id': f'{entity_name} {serial_no}',
+                        'default_entity_id': entity_id,
                         'command_topic': f'{BASE_TOPIC}/{serial_no}/set_zone_state/{x}', 
                         'state_topic': f'{BASE_TOPIC}/{serial_no}/zone_state/{x}', 
                         'payload_on': 'on', 
@@ -342,13 +343,14 @@ class AudioflowDevice:
                 # HA button entities
                 for x in ['off', 'on']:
                     entity_name = f'Turn all zones {x}'
+                    entity_id = f"button.{entity_name.replace(' ','_').lower()}_{serial_no}"
                     await client.publish(f'{ha_button}{serial_no}/all_zones_{x}/config',json.dumps({
                         'availability': [
                             {'topic': f'{BASE_TOPIC}/status'},
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
                         'name': entity_name,
-                        'object_id': f'{entity_name} {serial_no}',
+                        'default_entity_id': entity_id,
                         'command_topic': f'{BASE_TOPIC}/{serial_no}/set_zone_state', 
                         'payload_press': x, 
                         'unique_id': f'{serial_no}_all_zones_{x}', 
@@ -370,13 +372,14 @@ class AudioflowDevice:
                                         }
                 for x in network_info_names.keys():
                     entity_name = f"{network_info_names[x]['name']}"
+                    entity_id = f"sensor.{entity_name.replace(' ','_').lower()}_{serial_no}"
                     await client.publish(f'{ha_sensor}{serial_no}/{x}/config',json.dumps({
                         'availability': [
                             {'topic': f'{BASE_TOPIC}/status'},
                             {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
                             ], 
                         'name': entity_name,
-                        'object_id': f'{entity_name} {serial_no}',
+                        'default_entity_id': entity_id,
                         'state_topic': f'{BASE_TOPIC}/{serial_no}/network_info/{x}',
                         'icon': f"{network_info_names[x]['icon']}",
                         'unique_id': f'{serial_no}{x}',
