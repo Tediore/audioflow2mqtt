@@ -288,6 +288,17 @@ class AudioflowDevice:
             except Exception as e:
                 logging.error(f'Enable/disable zone for device at {ip} failed: {e}')
 
+    async def reboot_device(self, serial_no):
+        """Reboot the Audioflow device"""
+        device_url = self.devices[serial_no]['device_url']
+        ip = self.devices[serial_no]['ip_addr']
+        try:
+            async with httpx.AsyncClient() as httpx_async:
+                await httpx_async.get(url=device_url + 'reboot_now', timeout=self.timeout)
+            logging.info(f'Reboot command sent to Audioflow device at {ip}.')
+        except Exception as e:
+            logging.error(f'Reboot command for device at {ip} failed: {e}')
+
     async def poll_device_state(self, serial_no, httpx_async):
         """Poll for Audioflow device information every 10 seconds in case button(s) is/are pressed on device"""
         while True:
@@ -364,6 +375,27 @@ class AudioflowDevice:
                             'platform': 'mqtt'
                             }), qos=1, retain=True)
 
+                # HA button entity - reboot
+                await client.publish(f'{ha_button}{serial_no}/reboot/config', json.dumps({
+                    'availability': [
+                        {'topic': f'{BASE_TOPIC}/status'},
+                        {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
+                    ],
+                    'name': 'Reboot',
+                    'default_entity_id': f'button.reboot_{serial_no}',
+                    'command_topic': f'{BASE_TOPIC}/{serial_no}/reboot',
+                    'payload_press': 'reboot',
+                    'unique_id': f'{serial_no}_reboot',
+                    'icon': 'mdi:restart',
+                    'device': {
+                        'name': f'{name}',
+                        'identifiers': f'{serial_no}',
+                        'manufacturer': 'Audioflow',
+                        'model': f'{model}',
+                        'sw_version': f'{fw_version}'},
+                    'platform': 'mqtt'
+                }), qos=1, retain=True)
+
                 # HA sensor entities
                 network_info_names = {
                                         'ssid': {'name': 'SSID', 'icon': 'mdi:access-point-network'},
@@ -438,7 +470,7 @@ class Mqtt:
             async for msg in client.messages:
                 payload = msg.payload.decode('utf-8')
                 topic = str(msg.topic)
-                serial_no = topic[topic.find(BASE_TOPIC)+len(BASE_TOPIC)+1:topic.find('/set')]
+                serial_no = topic.split('/')[1]
                 switch_no = topic[-1:]
                 if 'set_zone_state' in topic:
                     if topic.endswith('e'): # if no zone number is present in topic
@@ -447,6 +479,8 @@ class Mqtt:
                         await d.set_zone_state(serial_no, switch_no, payload)
                 elif 'set_zone_enable' in topic:
                     await d.set_zone_enable(serial_no, switch_no, payload)
+                elif topic.endswith('/reboot'):
+                    await d.reboot_device(serial_no)
         except aiomqtt.MqttError:
             self.mqtt_connected = False
 
