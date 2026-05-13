@@ -29,6 +29,7 @@ if config_file:
     DEVICE_IPS = gen['devices'] if 'devices' in gen else None
     LOG_LEVEL = gen['log_level'].upper() if 'log_level' in gen else 'INFO'
     DISCOVERY_PORT = gen['discovery_port'] if 'discovery_port' in gen else 54321
+    HEALTH_CHECK_PORT = gen['health_check_port'] if 'health_check_port' in gen else 8080
 
 else:
     MQTT_HOST = os.getenv('MQTT_HOST', None)
@@ -41,6 +42,7 @@ else:
     DEVICE_IPS = os.getenv('DEVICE_IPS') if os.getenv('DEVICE_IPS') != None else os.getenv('DEVICES')
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
     DISCOVERY_PORT = int(os.getenv('DISCOVERY_PORT', 54321))
+    HEALTH_CHECK_PORT = int(os.getenv('HEALTH_CHECK_PORT', 8080))
 
 class NetworkDiscovery:
     def __init__(self):
@@ -125,6 +127,7 @@ class AudioflowDevice:
             self.devices[serial_no]['zones'] = {}
             self.devices[serial_no]['switch_names'] = []
             self.devices[serial_no]['retry_count'] = 0
+            self.devices[serial_no]['last_poll_success'] = asyncio.get_event_loop().time()
             self.serial_nos.append(serial_no)
 
             for item in device_info:
@@ -208,6 +211,7 @@ class AudioflowDevice:
             if retry_count > 0:
                 logging.info(f'Reconnected to Audioflow device at {ip}.')
             self.devices[serial_no]['retry_count'] = 0
+            self.devices[serial_no]['last_poll_success'] = asyncio.get_event_loop().time()
             if m.mqtt_connected:
                 await client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'online', qos=MQTT_QOS, retain=True)
         except Exception as e:
@@ -510,6 +514,44 @@ class Mqtt:
 
 m = Mqtt()
 
+async def health_check_server():
+    """Minimal HTTP server for Docker health checks on HEALTH_CHECK_PORT"""
+    async def handle(reader, writer):
+        try:
+            await reader.read(1024)
+            issues = []
+            if not m.mqtt_connected:
+                issues.append('MQTT disconnected')
+            now = asyncio.get_event_loop().time()
+            for serial_no in d.serial_nos:
+                last_poll = d.devices[serial_no].get('last_poll_success')
+                if last_poll is not None and now - last_poll > 30:
+                    ip = d.devices[serial_no]['ip_addr']
+                    issues.append(f'Device {serial_no} ({ip}) unreachable')
+            if issues:
+                status_line = 'HTTP/1.1 503 Service Unavailable'
+                body = '\n'.join(issues)
+            else:
+                status_line = 'HTTP/1.1 200 OK'
+                body = 'OK'
+            body_bytes = body.encode()
+            response = (
+                f'{status_line}\r\n'
+                f'Content-Type: text/plain\r\n'
+                f'Content-Length: {len(body_bytes)}\r\n'
+                f'Connection: close\r\n'
+                f'\r\n'
+            ).encode() + body_bytes
+            writer.write(response)
+            await writer.drain()
+        finally:
+            writer.close()
+
+    server = await asyncio.start_server(handle, '0.0.0.0', HEALTH_CHECK_PORT)
+    logging.info(f'Health check endpoint listening on port {HEALTH_CHECK_PORT}')
+    async with server:
+        await server.serve_forever()
+
 async def main():
     if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
         logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default (info)')
@@ -571,7 +613,8 @@ async def main():
         m.mqtt_init(),
         *device_state_polling,
         *network_info_polling,
-        m.mqtt_reconnect()
+        m.mqtt_reconnect(),
+        health_check_server()
     )
 
 if __name__ == '__main__':
