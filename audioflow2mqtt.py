@@ -515,6 +515,11 @@ async def main():
         logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default (info)')
     else:
         logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
+        if LOG_LEVEL != 'DEBUG':
+            class _HttpxGetFilter(logging.Filter):
+                def filter(self, record):
+                    return 'HTTP Request: GET ' not in record.getMessage()
+            logging.getLogger('httpx').addFilter(_HttpxGetFilter())
 
     logging.info(f'=== audioflow2mqtt version {version} started ===')
 
