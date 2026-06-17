@@ -5,7 +5,7 @@ audioflow2mqtt enables local control of your Audioflow speaker switch(es) via MQ
 <br>
 
 # Configuration
-audioflow2mqtt can be configured using a configuration file named **config.yaml** or with environment variables — the two are mutually exclusive. If a `config.yaml` is present in the working directory (mounted at `/config.yaml` in the container) it is used and environment variables are ignored; otherwise configuration comes entirely from the environment. Example config.yaml with all possible configuration options:
+audioflow2mqtt can be configured using a configuration file named **config.yaml** or with environment variables; the two are mutually exclusive. If a `config.yaml` is present in the working directory (mounted at `/config.yaml` in the container) it is used and environment variables are ignored; otherwise configuration comes entirely from the environment. Example config.yaml with all possible configuration options:
 ```yaml
 mqtt:
   host: 10.0.0.2
@@ -157,8 +157,8 @@ Publish to these topics to control a device. Per-zone commands take a trailing z
 
 Zone state is published after any change and refreshed by polling (device state every 10 seconds, network info every 60 seconds). The device does not report a new state after a command, so the gateway re-reads the affected zone(s) and republishes.
 
-- **Zone state:** `audioflow2mqtt/0123456789/zone_state/<zone>` — `on` or `off`
-- **Zone enabled/disabled:** `audioflow2mqtt/0123456789/zone_enabled/<zone>` — `1` or `0`
+- **Zone state:** `audioflow2mqtt/0123456789/zone_state/<zone>`: `on` or `off`
+- **Zone enabled/disabled:** `audioflow2mqtt/0123456789/zone_enabled/<zone>`: `1` or `0`
 
 Network info:
 
@@ -168,13 +168,13 @@ Network info:
 
 Availability (retained, used by Home Assistant for online/offline status):
 
-- `audioflow2mqtt/status` — `online`/`offline` for the gateway itself. This is published as a retained Last Will message, so if the gateway disconnects unexpectedly the broker publishes `offline` on its behalf.
-- `audioflow2mqtt/0123456789/status` — `online`/`offline` for an individual device, depending on whether it is reachable.
+- `audioflow2mqtt/status`: `online`/`offline` for the gateway itself. This is published as a retained Last Will message, so if the gateway disconnects unexpectedly the broker publishes `offline` on its behalf.
+- `audioflow2mqtt/0123456789/status`: `online`/`offline` for an individual device, depending on whether it is reachable.
 
 <br>
 
 # Important notes
-A single instance handles multiple Audioflow devices — every topic is namespaced by the device serial number, so they don't collide. You only need a separate instance (with a **different base topic**) if you deliberately run more than one copy against the same broker.
+A single instance handles multiple Audioflow devices; every topic is namespaced by the device serial number, so they don't collide. You only need a separate instance (with a **different base topic**) if you deliberately run more than one copy against the same broker.
 
 While audioflow2mqtt does support UDP discovery of Audioflow devices, creating a DHCP reservation for your Audioflow device(s) and setting `DEVICES` is recommended for reliability. UDP discovery will only work if the Audioflow device is on the same subnet as the machine audioflow2mqtt is running on.
 
