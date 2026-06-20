@@ -12,7 +12,7 @@ import yaml
 
 config_file = os.path.exists('config.yaml')
 
-version = '0.8.1'
+version = '0.8.2'
 
 
 def env_to_bool(value, default=True):
