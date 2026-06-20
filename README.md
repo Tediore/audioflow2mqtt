@@ -5,7 +5,7 @@ audioflow2mqtt enables local control of your Audioflow speaker switch(es) via MQ
 <br>
 
 # Configuration
-audioflow2mqtt can be configured using environment variables or by using a configuration file named **config.yaml**. Example config.yaml with all possible configuration options:
+audioflow2mqtt can be configured using a configuration file named **config.yaml** or with environment variables; the two are mutually exclusive. If a `config.yaml` is present in the working directory (mounted at `/config.yaml` in the container) it is used and environment variables are ignored; otherwise configuration comes entirely from the environment. Example config.yaml with all possible configuration options:
 ```yaml
 mqtt:
   host: 10.0.0.2
@@ -29,13 +29,13 @@ general:
 | Variable | Default | Required | Description |
 |----------|---------|----------|-------------|
 | `MQTT_HOST` | None | True |IP address or hostname of the MQTT broker to connect to. |
-| `MQTT_PORT` | 1883 | True | The port the MQTT broker is bound to. |
+| `MQTT_PORT` | 1883 | False | The port the MQTT broker is bound to. |
 | `MQTT_USER` | None | False | The user to send to the MQTT broker. |
 | `MQTT_PASSWORD` | None | False | The password to send to the MQTT broker. |
 | `MQTT_QOS` | 1 | False | The MQTT QoS level. |
-| `BASE_TOPIC` | audioflow2mqtt | True | The topic prefix to use for all payloads. |
+| `BASE_TOPIC` | audioflow2mqtt | False | The topic prefix to use for all payloads. |
 | `HOME_ASSISTANT` | True | False | Set to `True` to enable Home Assistant MQTT discovery or `False` to disable. |
-| `DEVICES` | None | Depends* | IP address(es) of your Audioflow device(s). If using environment variables, must be a comma-separated string (if multiple); otherwise, it must be a list. <br>\* Required if you don't plan to use UDP discovery. |
+| `DEVICES` | None | False | By default the gateway finds your Audioflow device(s) automatically via UDP discovery. Set this to use specific IP address(es) instead, which disables UDP discovery. With environment variables it must be a comma-separated string (if multiple); in config.yaml it must be a list. |
 | `DISCOVERY_PORT` | 54321 | False | The port to open on the host to send/receive UDP discovery packets. |
 | `LOG_LEVEL` | info | False | Set minimum log level. Valid options are `debug`, `info`, `warning`, and `error` |
 
@@ -140,51 +140,43 @@ audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for
 <br>
 
 # MQTT topic structure and examples
-The command topic syntax is `BASE_TOPIC/serial_number/command/zone_number` where `BASE_TOPIC` is the base topic you define, `serial_number` is the device serial number (found on the sticker on the bottom of the device), `command` is one of the below commands, and `zone_number` is the zone you want to control (zone A on the switch is zone number 1, zone B is zone number 2, and so on).
 
-Valid commands are `set_zone_state` and `set_zone_enable`. The examples below assume the base topic is the default (`audioflow2mqtt`) and the serial number is `0123456789`.
+All topics are prefixed with your `BASE_TOPIC` (default `audioflow2mqtt`). The examples below use the default base topic and the serial number `0123456789` (found on the sticker on the bottom of the device). Zones are numbered A = 1, B = 2, and so on.
 
-**Turn zone B (zone number 2) on or off, or toggle between states**
+**Commands you send**
 
-Topic: `audioflow2mqtt/0123456789/set_zone_state/2`
+Publish to these topics to control a device. Per-zone commands take a trailing zone number; the all-zones command does not.
 
-Valid payloads: `on`, `off`, `toggle`
+| Command topic | Valid payloads | Effect |
+|---------------|----------------|--------|
+| `audioflow2mqtt/0123456789/set_zone_state/<zone>` | `on`, `off`, `toggle` | Turn one zone on/off, or toggle it |
+| `audioflow2mqtt/0123456789/set_zone_state` | `on`, `off` | Turn **all** zones on/off (no zone number; `toggle` is not supported here) |
+| `audioflow2mqtt/0123456789/set_zone_enable/<zone>` | `1`, `0` | Enable (`1`) or disable (`0`) one zone |
 
-**Turn all zones on or off**
+**Topics the gateway publishes**
 
-Topic: `audioflow2mqtt/0123456789/set_zone_state` (note the lack of a zone number at the end of the topic)
+Zone state is published after any change and refreshed by polling (device state every 10 seconds, network info every 60 seconds). The device does not report a new state after a command, so the gateway re-reads the affected zone(s) and republishes.
 
-Valid payloads: `on`, `off`
+- **Zone state:** `audioflow2mqtt/0123456789/zone_state/<zone>`: `on` or `off`
+- **Zone enabled/disabled:** `audioflow2mqtt/0123456789/zone_enabled/<zone>`: `1` or `0`
 
-**Enable or disable zone A (zone number 1)**
-_This might not really be something you would need, but I figured I'd add it anyway_
+Network info:
 
-Topic: `audioflow2mqtt/0123456789/set_zone_enable/1`
+- **SSID:** `audioflow2mqtt/0123456789/network_info/ssid`
+- **Wi-Fi channel:** `audioflow2mqtt/0123456789/network_info/channel`
+- **RSSI:** `audioflow2mqtt/0123456789/network_info/rssi`
 
-Valid payloads: `1` for enabled, `0` for disabled
+Availability (retained, used by Home Assistant for online/offline status):
 
-<br>
-
-When the zone state or enabled/disabled status is changed, audioflow2mqtt publishes the result to the following topics:
-
-**Zone state:** `audioflow2mqtt/0123456789/zone_state/ZONE`
-
-**Zone enabled/disabled:** `audioflow2mqtt/0123456789/zone_enabled/ZONE`
-
-<br>
-
-Network info is published to the following topics:
-
-**SSID:** `audioflow2mqtt/0123456789/network_info/ssid`
-
-**Wi-fi channel:** `audioflow2mqtt/0123456789/network_info/channel`
-
-**RSSI:** `audioflow2mqtt/0123456789/network_info/rssi`
+- `audioflow2mqtt/status`: `online`/`offline` for the gateway itself. This is published as a retained Last Will message, so if the gateway disconnects unexpectedly the broker publishes `offline` on its behalf.
+- `audioflow2mqtt/0123456789/status`: `online`/`offline` for an individual device, depending on whether it is reachable.
 
 <br>
 
 # Important notes
-When running separate instances for multiple devices, you will need to set a **different base topic for each instance**. Also, while audioflow2mqtt does support UDP discovery of Audioflow devices, creating a DHCP reservation for your Audioflow device(s) and setting `DEVICES` is recommended. UDP discovery will only work if the Audioflow device is on the same subnet as the machine audioflow2mqtt is running on.
+A single instance handles multiple Audioflow devices; every topic is namespaced by the device serial number, so they don't collide. You only need a separate instance (with a **different base topic**) if you deliberately run more than one copy against the same broker.
+
+While audioflow2mqtt does support UDP discovery of Audioflow devices, creating a DHCP reservation for your Audioflow device(s) and setting `DEVICES` is recommended for reliability. UDP discovery will only work if the Audioflow device is on the same subnet as the machine audioflow2mqtt is running on.
 
 <br>
 <a href="https://www.buymeacoffee.com/tediore" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-orange.png" alt="Buy Me A Coffee" height="41" width="174"></a>
