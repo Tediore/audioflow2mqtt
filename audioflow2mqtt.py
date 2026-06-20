@@ -14,6 +14,19 @@ config_file = os.path.exists('config.yaml')
 
 version = '0.8.1'
 
+
+def env_to_bool(value, default=True):
+    """Interpret an environment-variable string (or bool) as a boolean.
+
+    Returns ``default`` when ``value`` is ``None`` (variable unset). Otherwise
+    'false', '0', 'no', 'off' and '' (case-insensitive) are False; everything
+    else is True.
+    """
+    if value is None:
+        return default
+    return str(value).strip().lower() not in ('false', '0', 'no', 'off', '')
+
+
 if config_file:
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
@@ -37,7 +50,7 @@ else:
     MQTT_PASSWORD = os.getenv('MQTT_PASSWORD', None)
     MQTT_QOS = int(os.getenv('MQTT_QOS', 1))
     BASE_TOPIC = os.getenv('BASE_TOPIC', 'audioflow2mqtt')
-    HOME_ASSISTANT = os.getenv('HOME_ASSISTANT', True)
+    HOME_ASSISTANT = env_to_bool(os.getenv('HOME_ASSISTANT'), True)
     DEVICE_IPS = os.getenv('DEVICE_IPS') if os.getenv('DEVICE_IPS') != None else os.getenv('DEVICES')
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
     DISCOVERY_PORT = int(os.getenv('DISCOVERY_PORT', 54321))
@@ -163,6 +176,7 @@ class AudioflowDevice:
                 device_info = await httpx_async.get(url=device_url + 'switch', timeout=self.timeout)    
             except Exception as e:
                 logging.error(f'Unable to get network info: {e}')
+                return  # skip this cycle; the next poll will retry
             device_info = json.loads(device_info.text)
             wifi = device_info['wifi']
             ssid = wifi[:wifi.find('[')].strip()
