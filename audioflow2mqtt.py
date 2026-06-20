@@ -12,8 +12,7 @@ import yaml
 
 config_file = os.path.exists('config.yaml')
 
-version = '0.8.2'
-
+version = '0.9.0'
 
 def env_to_bool(value, default=True):
     """Interpret an environment-variable string (or bool) as a boolean.
@@ -25,7 +24,6 @@ def env_to_bool(value, default=True):
     if value is None:
         return default
     return str(value).strip().lower() not in ('false', '0', 'no', 'off', '')
-
 
 if config_file:
     with open('config.yaml', 'r') as file:
