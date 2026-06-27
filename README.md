@@ -132,7 +132,8 @@ tediore/audioflow2mqtt:stable
 # Home Assistant
 audioflow2mqtt supports Home Assistant MQTT discovery which creates a Device for the Audioflow switch with the following:
 - Switch entities for each zone
-- Button entities to turn all zones on/off
+- A switch entity for "exclusive mode" (a feature in firmware version >= v1.10.000035 which allows for only one zone to be turned on at any given time)
+- Button entities to turn all zones on/off and reboot the device
 - Sensors for SSID, RSSI (signal strength), and Wi-Fi channel
 
 ![Home Assistant Device screenshot](ha_screenshot.png)
@@ -152,6 +153,7 @@ Publish to these topics to control a device. Per-zone commands take a trailing z
 | `audioflow2mqtt/0123456789/set_zone_state/<zone>` | `on`, `off`, `toggle` | Turn one zone on/off, or toggle it |
 | `audioflow2mqtt/0123456789/set_zone_state` | `on`, `off` | Turn **all** zones on/off (no zone number; `toggle` is not supported here) |
 | `audioflow2mqtt/0123456789/set_zone_enable/<zone>` | `1`, `0` | Enable (`1`) or disable (`0`) one zone |
+| `audioflow2mqtt/0123456789/set_exclusive_mode1 | `on`, `off` | Enable or disable exclusive mode |
 
 **Topics the gateway publishes**
 
@@ -165,6 +167,9 @@ Network info:
 - **SSID:** `audioflow2mqtt/0123456789/network_info/ssid`
 - **Wi-Fi channel:** `audioflow2mqtt/0123456789/network_info/channel`
 - **RSSI:** `audioflow2mqtt/0123456789/network_info/rssi`
+
+Exclusive mode:
+- **Exclusive mode** `audioflow2mqtt/0123456789/exclusive mode`: `on` or `off`
 
 Availability (retained, used by Home Assistant for online/offline status):
 
