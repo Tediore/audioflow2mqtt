@@ -12,8 +12,9 @@ import yaml
 
 config_file = os.path.exists('config.yaml')
 
-version = '0.8.2'
+version = '0.9.0'
 
+httpx_async = httpx.AsyncClient()
 
 def env_to_bool(value, default=True):
     """Interpret an environment-variable string (or bool) as a boolean.
@@ -25,7 +26,6 @@ def env_to_bool(value, default=True):
     if value is None:
         return default
     return str(value).strip().lower() not in ('false', '0', 'no', 'off', '')
-
 
 if config_file:
     with open('config.yaml', 'r') as file:
@@ -108,6 +108,7 @@ class NetworkDiscovery:
 
 class AudioflowDevice:
     global client
+    global httpx_async
     def __init__(self):
         self.timeout = 3
         self.states = ['off', 'on']
@@ -115,7 +116,7 @@ class AudioflowDevice:
         self.devices = {}
         self.serial_nos = []
 
-    async def get_device_info(self, device_url, ip, nwk_discovery, httpx_async):
+    async def get_device_info(self, device_url, ip, nwk_discovery):
         """Get info about Audioflow device(s)"""
         device = True
         zone_list = ['A', 'B', 'C', 'D']
@@ -138,7 +139,10 @@ class AudioflowDevice:
             self.devices[serial_no]['zones'] = {}
             self.devices[serial_no]['switch_names'] = []
             self.devices[serial_no]['retry_count'] = 0
+            self.devices[serial_no]['last_poll_success'] = asyncio.get_event_loop().time()
             self.serial_nos.append(serial_no)
+            if 'exclusive' in device_info:
+                self.devices[serial_no]['exclusive'] = device_info['exclusive']
 
             for item in device_info:
                 self.devices[serial_no][item] = device_info[item]
@@ -164,7 +168,7 @@ class AudioflowDevice:
             
             logging.debug(self.devices[serial_no])
 
-    async def get_network_info(self, serial_no, httpx_async):
+    async def get_network_info(self, serial_no):
         """
         Get SSID and device signal strength
         String parsing :(
@@ -176,7 +180,7 @@ class AudioflowDevice:
                 device_info = await httpx_async.get(url=device_url + 'switch', timeout=self.timeout)    
             except Exception as e:
                 logging.error(f'Unable to get network info: {e}')
-                return  # skip this cycle; the next poll will retry
+                return
             device_info = json.loads(device_info.text)
             wifi = device_info['wifi']
             ssid = wifi[:wifi.find('[')].strip()
@@ -195,8 +199,7 @@ class AudioflowDevice:
         """Get info about one zone and publish to MQTT"""
         device_url = self.devices[serial_no]['device_url']
         try:
-            async with httpx.AsyncClient() as httpx_async:
-                zones = await httpx_async.get(url=device_url + 'zones', timeout=self.timeout)
+            zones = await httpx_async.get(url=device_url + 'zones', timeout=self.timeout)
             self.devices[serial_no]['zones'] = json.loads(zones.text)
         except Exception as e:
             logging.error(f'Unable to get zone info: {e}')
@@ -209,7 +212,7 @@ class AudioflowDevice:
             except Exception as e:
                 logging.error(f'Unable to publish zone state: {e}')
 
-    async def get_all_zones(self, serial_no, httpx_async):
+    async def get_all_zones(self, serial_no):
         """Get info about all zones"""
         device_url = self.devices[serial_no]['device_url']
         ip = self.devices[serial_no]['ip_addr']
@@ -221,6 +224,7 @@ class AudioflowDevice:
             if retry_count > 0:
                 logging.info(f'Reconnected to Audioflow device at {ip}.')
             self.devices[serial_no]['retry_count'] = 0
+            self.devices[serial_no]['last_poll_success'] = asyncio.get_event_loop().time()
             if m.mqtt_connected:
                 await client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'online', qos=MQTT_QOS, retain=True)
         except Exception as e:
@@ -232,6 +236,25 @@ class AudioflowDevice:
                     await client.publish(f'{BASE_TOPIC}/{serial_no}/status', 'offline', qos=MQTT_QOS, retain=True)
                 logging.warning(f'Audioflow device at {ip} unreachable; marking as offline.')
                 logging.warning(f'Trying to reconnect to {ip} every 10 sec in the background...')
+
+    async def get_exclusive_mode(self, serial_no):
+        """Get state of exclusive mode and publish to MQTT"""
+        device_url = self.devices[serial_no]['device_url']
+        try:
+            device_info = await httpx_async.get(url=device_url + 'switch', timeout=self.timeout)
+            device_info = json.loads(device_info.text)
+            if 'exclusive' in device_info:
+                if device_info['exclusive']:
+                    exclusive = 'on'
+                else:
+                    exclusive = 'off'
+            else:
+                logging.error(f"Exclusive mode not supported on device at {self.devices[serial_no]['ip_addr']}.")
+                return
+            if m.mqtt_connected:
+                await client.publish(f'{BASE_TOPIC}/{serial_no}/exclusive_mode', str(exclusive), qos=MQTT_QOS)
+        except Exception as e:
+            logging.error(f'Unable to get exclusive mode state: {e}')
 
     async def publish_all_zones(self, serial_no):
         """Publish info about all zones to MQTT"""
@@ -251,6 +274,7 @@ class AudioflowDevice:
         zones = self.devices[serial_no]['zones']['zones']
         device_url = self.devices[serial_no]['device_url']
         ip = self.devices[serial_no]['ip_addr']
+        exclusive_mode = self.devices[serial_no]['exclusive']
         if int(zone_no) > zone_count:
             logging.warning(f'{zone_no} is an invalid zone number.')
         elif zones[int(zone_no)-1]['enabled'] == 0:
@@ -263,9 +287,8 @@ class AudioflowDevice:
                         data = self.states.index(zone_state)
                     else:
                         data = 1 if current_state == 'off' else 0
-                    async with httpx.AsyncClient() as httpx_async:
-                        await httpx_async.put(url=device_url + 'zones/' + str(zone_no), data=str(data), timeout=self.timeout)
-                    await d.get_one_zone(serial_no, zone_no) # Device does not send new state after state change, so we get the new state and publish it to MQTT
+                    await httpx_async.put(url=device_url + 'zones/' + str(zone_no), data=str(data), timeout=self.timeout)
+                    await d.get_all_zones(serial_no)
                 except Exception as e:
                     logging.error(f'Set zone state for device at {ip} failed: {e}')
             else:
@@ -278,9 +301,8 @@ class AudioflowDevice:
         if zone_state in self.states:
             try:
                 data = self.set_all_zones[zone_state]
-                async with httpx.AsyncClient() as httpx_async:
-                    await httpx_async.put(url=device_url + 'zones', data=str(data), timeout=self.timeout)
-                    await d.get_all_zones(serial_no, httpx_async) # Device does not send new state after state change, so we get the new state and publish it to MQTT
+                await httpx_async.put(url=device_url + 'zones', data=str(data), timeout=self.timeout)
+                await d.get_all_zones(serial_no) # Device does not send new state after state change, so we get the new state and publish it to MQTT
             except Exception as e:
                 logging.error(f'Set all zone states for device at {ip} failed: {e}')
         elif zone_state == 'toggle':
@@ -296,23 +318,53 @@ class AudioflowDevice:
         if int(zone_enable) in [0, 1]:
             try:
                 # Audioflow device expects the zone name in the same payload when enabling/disabling zone, so we append the existing name here
-                async with httpx.AsyncClient() as httpx_async:
-                    await httpx_async.put(url=device_url + 'zonename/' + str(zone_no), data=str(str(zone_enable) + str(switch_names[int(zone_no)-1]).strip()), timeout=self.timeout)
+                await httpx_async.put(url=device_url + 'zonename/' + str(zone_no), data=str(str(zone_enable) + str(switch_names[int(zone_no)-1]).strip()), timeout=self.timeout)
                 await d.get_one_zone(serial_no, zone_no)
             except Exception as e:
                 logging.error(f'Enable/disable zone for device at {ip} failed: {e}')
 
-    async def poll_device_state(self, serial_no, httpx_async):
-        """Poll for Audioflow device information every 10 seconds in case button(s) is/are pressed on device"""
+    async def reboot_device(self, serial_no):
+        """Reboot the Audioflow device"""
+        device_url = self.devices[serial_no]['device_url']
+        ip = self.devices[serial_no]['ip_addr']
+        try:
+            await httpx_async.get(url=device_url + 'reboot_now', timeout=self.timeout)
+            logging.info(f'Reboot command sent to Audioflow device at {ip}.')
+        except Exception as e:
+            logging.error(f'Reboot command for device at {ip} failed: {e}')
+
+    async def set_exclusive_mode(self, serial_no, exclusive_mode):
+        """Turn exclusive mode on or off"""
+        device_url = self.devices[serial_no]['device_url']
+        ip = self.devices[serial_no]['ip_addr']
+        if 'exclusive' in self.devices[serial_no]:
+            if exclusive_mode in ['on', 'off']:
+                command = 'enable' if exclusive_mode == 'on' else 'disable'
+                try:
+                    await httpx_async.put(url=device_url + 'exclusive', data=str(command), timeout=self.timeout)
+                    await asyncio.sleep(0.1) # A small delay seems to help the correct exclusive state get published
+                    await d.get_exclusive_mode(serial_no)
+                    await d.get_all_zones(serial_no)
+                except Exception as e:
+                    logging.error(f'Set exclusive mode for device at {ip} failed: {e}')
+            else:
+                logging.warning(f'"{exclusive_mode}" is not a valid command. Valid commands are on, off')
+        else:
+            logging.error(f"Exclusive mode not supported on device at {ip}.")
+
+
+    async def poll_device_state(self, serial_no):
+        """Poll for Audioflow device information every 10 seconds in case button(s) is/are pressed on device or exclusive mode is changed"""
         while True:
             await asyncio.sleep(10)
-            await d.get_all_zones(serial_no, httpx_async)
+            await d.get_all_zones(serial_no)
+            await d.get_exclusive_mode(serial_no)
 
-    async def poll_network_info(self, serial_no, httpx_async):
+    async def poll_network_info(self, serial_no):
         """Poll for Audioflow device network information every 60 seconds"""
         while True:
             await asyncio.sleep(60)
-            await d.get_network_info(serial_no, httpx_async)
+            await d.get_network_info(serial_no)
 
     async def mqtt_discovery(self, serial_no, client):
         """Send Home Assistant MQTT discovery payloads"""
@@ -354,6 +406,32 @@ class AudioflowDevice:
                             'platform': 'mqtt'
                             }), qos=1, retain=True)
 
+                # HA switch entity for exclusive mode
+                if 'exclusive' in self.devices[serial_no]:
+                    entity_name = f'{name} exclusive mode'
+                    entity_id = f"switch.{entity_name.replace(' ','_').lower()}_{serial_no}"
+                    await client.publish(f'{ha_switch}{serial_no}/exclusive/config',json.dumps({
+                        'availability': [
+                            {'topic': f'{BASE_TOPIC}/status'},
+                            {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
+                            ], 
+                        'name': entity_name, 
+                        'default_entity_id': entity_id,
+                        'command_topic': f'{BASE_TOPIC}/{serial_no}/set_exclusive_mode', 
+                        'state_topic': f'{BASE_TOPIC}/{serial_no}/exclusive_mode', 
+                        'payload_on': 'on', 
+                        'payload_off': 'off', 
+                        'unique_id': f'{serial_no}exclusive_mode',
+                        'icon': 'mdi:speaker',
+                        'device': {
+                            'name': f'{name}', 
+                            'identifiers': f'{serial_no}', 
+                            'manufacturer': 'Audioflow', 
+                            'model': f'{model}', 
+                            'sw_version': f'{fw_version}'}, 
+                            'platform': 'mqtt'
+                            }), qos=1, retain=True)
+
                 # HA button entities
                 for x in ['off', 'on']:
                     entity_name = f'Turn all zones {x}'
@@ -377,6 +455,27 @@ class AudioflowDevice:
                             'sw_version': f'{fw_version}'}, 
                             'platform': 'mqtt'
                             }), qos=1, retain=True)
+
+                # HA button entity - reboot
+                await client.publish(f'{ha_button}{serial_no}/reboot/config', json.dumps({
+                    'availability': [
+                        {'topic': f'{BASE_TOPIC}/status'},
+                        {'topic': f'{BASE_TOPIC}/{serial_no}/status'}
+                    ],
+                    'name': 'Reboot',
+                    'default_entity_id': f'button.reboot_{serial_no}',
+                    'command_topic': f'{BASE_TOPIC}/{serial_no}/reboot',
+                    'payload_press': 'reboot',
+                    'unique_id': f'{serial_no}_reboot',
+                    'icon': 'mdi:restart',
+                    'device': {
+                        'name': f'{name}',
+                        'identifiers': f'{serial_no}',
+                        'manufacturer': 'Audioflow',
+                        'model': f'{model}',
+                        'sw_version': f'{fw_version}'},
+                    'platform': 'mqtt'
+                }), qos=1, retain=True)
 
                 # HA sensor entities
                 network_info_names = {
@@ -452,7 +551,7 @@ class Mqtt:
             async for msg in client.messages:
                 payload = msg.payload.decode('utf-8')
                 topic = str(msg.topic)
-                serial_no = topic[topic.find(BASE_TOPIC)+len(BASE_TOPIC)+1:topic.find('/set')]
+                serial_no = topic.split('/')[1]
                 switch_no = topic[-1:]
                 if 'set_zone_state' in topic:
                     if topic.endswith('e'): # if no zone number is present in topic
@@ -461,6 +560,11 @@ class Mqtt:
                         await d.set_zone_state(serial_no, switch_no, payload)
                 elif 'set_zone_enable' in topic:
                     await d.set_zone_enable(serial_no, switch_no, payload)
+                elif topic.endswith('/reboot'):
+                    await d.reboot_device(serial_no)
+                elif 'set_exclusive_mode' in topic:
+                    await d.set_exclusive_mode(serial_no, payload)
+
         except aiomqtt.MqttError:
             self.mqtt_connected = False
 
@@ -490,10 +594,16 @@ class Mqtt:
 m = Mqtt()
 
 async def main():
+
     if LOG_LEVEL.lower() not in ['debug', 'info', 'warning', 'error']:
         logging.warning(f'Selected log level "{LOG_LEVEL}" is not valid; using default (info)')
     else:
         logging.basicConfig(level=LOG_LEVEL, format='%(asctime)s %(levelname)s: %(message)s')
+        if LOG_LEVEL != 'DEBUG':
+            class _HttpxGetFilter(logging.Filter):
+                def filter(self, record):
+                    return 'HTTP Request: GET ' not in record.getMessage()
+            logging.getLogger('httpx').addFilter(_HttpxGetFilter())
 
     logging.info(f'=== audioflow2mqtt version {version} started ===')
 
@@ -533,19 +643,17 @@ async def main():
             n.sock.close()
             sys.exit(1)
 
-    httpx_async = httpx.AsyncClient()
-
     for ip in device_ips:
         device_url = f'http://{ip}/'
-        await d.get_device_info(device_url, ip, nwk_discovery, httpx_async)
-    device_state_polling = [d.poll_device_state(serial_no, httpx_async) for serial_no in d.serial_nos]
-    network_info_polling = [d.poll_network_info(serial_no, httpx_async) for serial_no in d.serial_nos]
+        await d.get_device_info(device_url, ip, nwk_discovery)
+    device_state_polling = [d.poll_device_state(serial_no) for serial_no in d.serial_nos]
+    network_info_polling = [d.poll_network_info(serial_no) for serial_no in d.serial_nos]
 
     await asyncio.gather(
         m.mqtt_init(),
         *device_state_polling,
         *network_info_polling,
-        m.mqtt_reconnect()
+        m.mqtt_reconnect(),
     )
 
 if __name__ == '__main__':
