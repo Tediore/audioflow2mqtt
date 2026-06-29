@@ -146,14 +146,14 @@ All topics are prefixed with your `BASE_TOPIC` (default `audioflow2mqtt`). The e
 
 **Commands you send**
 
-Publish to these topics to control a device. Per-zone commands take a trailing zone number; the all-zones command does not.
+Publish to these topics to control a device. Per-zone commands take a trailing zone number; the all-zones and exclusive mode commands does not.
 
 | Command topic | Valid payloads | Effect |
 |---------------|----------------|--------|
 | `audioflow2mqtt/0123456789/set_zone_state/<zone>` | `on`, `off`, `toggle` | Turn one zone on/off, or toggle it |
 | `audioflow2mqtt/0123456789/set_zone_state` | `on`, `off` | Turn **all** zones on/off (no zone number; `toggle` is not supported here) |
 | `audioflow2mqtt/0123456789/set_zone_enable/<zone>` | `1`, `0` | Enable (`1`) or disable (`0`) one zone |
-| `audioflow2mqtt/0123456789/set_exclusive_mode1 | `on`, `off` | Enable or disable exclusive mode |
+| `audioflow2mqtt/0123456789/set_exclusive_mode` | `on`, `off` | Enable or disable exclusive mode |
 
 **Topics the gateway publishes**
 
